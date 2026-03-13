@@ -12,7 +12,7 @@ const app = {
     lastSelectedId: null,
     activeTab: 'own',
     userName: '',
-    globalCompactMode: false,
+    globalCompactMode: true,
     searchQuery: '',
     
     promptCallback: null,
