@@ -148,14 +148,14 @@ const app = {
         try {
             const { data, error } = await this.supabaseClient
                 .from('profiles')
-                .select('id, email')
-                .neq('id', this.currentUser.id);
+                .select('id, email');
             
-            if (!error) {
-                this.usersList = data || [];
+            if (!error && data) {
+                this.usersList = data.filter(u => u.id !== this.currentUser?.id);
             }
         } catch (err) {
             console.log('Erro ao carregar usuários:', err);
+            this.usersList = [];
         }
     },
 
@@ -496,7 +496,10 @@ const app = {
         const availableUsers = this.usersList.filter(u => !sharedWith.includes(u.id));
         
         if (availableUsers.length === 0) {
-            userListEl.innerHTML = '<p class="text-center text-slate-400 py-4">Nenhum usuário disponível para compartilhar</p>';
+            userListEl.innerHTML = `
+                <p class="text-center text-slate-400 py-2">Nenhum usuário cadastrado ainda.</p>
+                <p class="text-center text-slate-400 text-xs pb-2">Outro usuário precisa criar uma conta primeiro.</p>
+            `;
         } else {
             availableUsers.forEach(user => {
                 const btn = document.createElement('button');
