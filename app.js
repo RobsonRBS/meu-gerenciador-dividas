@@ -233,13 +233,23 @@ const app = {
                 .from('profiles')
                 .select('id, email');
             
-            if (error) {
-                console.log('Error loading users:', error);
-            }
+            console.log('Profiles data:', data, error);
             
-            if (data) {
+            if (!data || data.length === 0) {
+                console.log('Profiles vazio, buscando de auth.users...');
+                const { data: authData } = await this.supabaseClient
+                    .from('auth.users')
+                    .select('id, email');
+                
+                if (authData) {
+                    console.log('Auth users:', authData);
+                    this.usersList = authData.filter(u => u.id !== this.currentUser?.id);
+                }
+            } else {
                 this.usersList = data.filter(u => u.id !== this.currentUser?.id);
             }
+            
+            console.log('Users list:', this.usersList);
         } catch (err) {
             console.log('Erro ao carregar usuários:', err);
             this.usersList = [];
