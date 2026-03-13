@@ -159,6 +159,14 @@ const app = {
         }
     },
 
+    formatDateForDisplay(dateTimeStr) {
+        if (!dateTimeStr) return '';
+        const [datePart] = dateTimeStr.split('T');
+        if (!datePart) return dateTimeStr;
+        const [year, month, day] = datePart.split('-');
+        return `${day}/${month}/${year}`;
+    },
+
     formatDateTimeForDisplay(dateTimeStr) {
         if (!dateTimeStr) return '';
         const [datePart, timePart] = dateTimeStr.split('T');
@@ -870,15 +878,17 @@ const app = {
             const safeDebt = this.sanitizeDebt(d);
             const isExp = this.expandedIds.has(d.id);
             const canEdit = d.creator_id && d.creator_id === this.currentUser.id;
+            const isShared = !canEdit && d.creator_id;
             const paidVal = d.installments
                 .filter(i => i.status === 'Pago')
                 .reduce((acc, i) => acc + parseFloat(i.value), 0);
             const totalVal = parseFloat(d.total_value);
 
             const card = document.createElement('div');
-            card.className = "bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden";
+            card.className = `bg-white rounded-xl shadow-md overflow-hidden ${isShared ? 'border-2 border-blue-300' : 'border border-slate-200'}`;
             card.innerHTML = `
-                <div class="p-6 cursor-pointer" onclick="app.toggleExpand('${d.id}')">
+                <div class="p-4 cursor-pointer" onclick="app.toggleExpand('${d.id}')">
+                    ${isShared ? '<div class="bg-blue-50 text-blue-600 text-[10px] font-bold uppercase py-1 px-2 rounded mb-2">Compartilhada</div>' : ''}
                     <div class="flex justify-between items-start mb-2">
                         <div>
                             <h3 class="font-black text-slate-800 uppercase text-2xl leading-tight">${safeDebt.creditor}</h3>
@@ -926,7 +936,7 @@ const app = {
                     ${(() => {
                         const isCompact = this.compactMode.has(d.id);
                         if (isCompact) {
-                            return `<div class="grid grid-cols-5 gap-1 text-xs">` + 
+                            return `<div class="grid grid-cols-6 gap-0.5 text-xs">` + 
                                 d.installments.map(i => `
                                     <div onclick="app.toggleCompactInstallment('${d.id}', ${i.id})" class="p-2 rounded cursor-pointer ${i.status === 'Pago' ? 'bg-emerald-100 text-emerald-700 border-2 border-emerald-500' : 'bg-slate-100 text-slate-600 border-2 border-transparent hover:border-indigo-300'}">
                                         <div class="font-bold text-xs">R$ ${parseFloat(i.value).toFixed(0)}</div>
@@ -941,7 +951,7 @@ const app = {
                             <div class="relative rounded-lg overflow-hidden">
                                 <div class="swipe-bg-right uppercase">Pago</div>
                                 <div class="swipe-bg-left uppercase">Pendente</div>
-                                <div class="inst-card p-3 flex items-center justify-between border border-slate-200" 
+                                <div class="inst-card p-2 flex items-center justify-between border border-slate-200" 
                                      ontouchstart="app.tS(event)" 
                                      ontouchmove="app.tM(event)" 
                                      ontouchend="app.tE(event, '${d.id}', ${i.id})"
@@ -956,7 +966,7 @@ const app = {
                                         <div>
                                             <p class="text-lg font-black ${i.status === 'Pago' ? 'text-emerald-500' : 'text-slate-800'} cursor-pointer hover:text-indigo-500" onclick="event.stopPropagation(); app.editInstallmentValue('${d.id}', ${i.id})">R$ ${i.value}</p>
                                             <div class="flex gap-4 mt-1">
-                                                <p class="text-xs font-bold text-slate-400 cursor-pointer hover:text-indigo-500" onclick="app.editDate('${d.id}', ${i.id}, 'dueDate')">Venc: <span class="underline">${app.formatDateTimeForDisplay(i.dueDate)}</span></p>
+                                                <p class="text-xs font-bold text-slate-400 cursor-pointer hover:text-indigo-500" onclick="app.editDate('${d.id}', ${i.id}, 'dueDate')">Venc: <span class="underline">${app.formatDateForDisplay(i.dueDate)}</span></p>
                                                 ${i.paidAt ? `<p class="text-xs font-bold text-emerald-400 cursor-pointer hover:text-indigo-500" onclick="app.editDate('${d.id}', ${i.id}, 'paidAt')">Pago: <span class="underline">${app.formatDateTimeForDisplay(i.paidAt)}</span></p>` : ''}
                                             </div>
                                             ${i.note ? `<div class="text-xs font-bold text-slate-500 mt-1 cursor-pointer hover:text-indigo-500" onclick="app.editInstallmentNote('${d.id}', ${i.id})">📝 ${i.note}</div>` : `<div class="text-xs text-slate-300 mt-1 cursor-pointer hover:text-indigo-500" onclick="app.editInstallmentNote('${d.id}', ${i.id})">+ obs</div>`}
@@ -977,7 +987,7 @@ const app = {
                                 <div>
                                     <p class="text-lg font-black ${i.status === 'Pago' ? 'text-emerald-500' : 'text-slate-800'}">R$ ${i.value}</p>
                                     <div class="flex gap-4 mt-1">
-                                        <p class="text-xs font-bold text-slate-400">Venc: ${app.formatDateTimeForDisplay(i.dueDate)}</p>
+                                        <p class="text-xs font-bold text-slate-400">Venc: ${app.formatDateForDisplay(i.dueDate)}</p>
                                         ${i.paidAt ? `<p class="text-xs font-bold text-emerald-400">Pago: ${app.formatDateTimeForDisplay(i.paidAt)}</p>` : ''}
                                     </div>
                                     ${i.note ? `<div class="text-xs font-bold text-slate-500 mt-1">📝 ${i.note}</div>` : ''}
