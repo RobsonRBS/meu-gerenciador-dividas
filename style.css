@@ -16,10 +16,11 @@ body {
     background: var(--color-bg);
     -webkit-tap-highlight-color: transparent;
     user-select: none;
+    overflow-x: hidden;
 }
 
 .inst-card {
-    transition: all 0.2s ease;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     z-index: 10;
     background: white;

@@ -46,6 +46,7 @@
                 <p id="userEmail" class="text-[10px] md:text-xs font-black text-slate-400 mt-1 uppercase tracking-widest"></p>
             </div>
             <div class="flex gap-2">
+                <button onclick="app.showTemplatesModal()" title="Templates" class="p-2 text-indigo-600 font-bold text-sm bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors">📄 TEMPLATES</button>
                 <button onclick="app.showSettingsModal()" class="p-2 text-slate-400 font-bold text-sm">⚙️</button>
                 <button onclick="app.logout()" class="p-2 text-slate-400 font-bold text-sm">SAIR</button>
                 <button onclick="app.showModal('debtModal')" class="bg-indigo-600 text-white w-12 h-12 rounded-lg shadow-lg flex items-center justify-center font-bold text-2xl hover:bg-indigo-700 transition-colors shadow-indigo-200">+</button>
@@ -97,10 +98,42 @@
         </div>
     </div>
 
-    <div class="sticky top-[73px] z-30 bg-slate-100 border-b border-slate-200 px-4 py-2">
-        <div class="max-w-7xl mx-auto flex justify-center gap-2">
-            <button onclick="app.switchTab('own')" id="tab-own" class="w-full max-w-xs py-2 px-4 rounded-lg font-bold text-sm uppercase bg-indigo-600 text-white">Minhas Dívidas</button>
-            <button onclick="app.switchTab('shared')" id="tab-shared" class="w-full max-w-xs py-2 px-4 rounded-lg font-bold text-sm uppercase bg-white text-slate-600">Com. pra mim</button>
+    <div class="sticky top-[73px] z-30 bg-slate-100 border-b border-slate-200 px-4 py-3">
+        <div class="max-w-7xl mx-auto space-y-3">
+            <!-- Tabs -->
+            <div class="flex justify-center gap-2">
+                <button onclick="app.switchTab('own')" id="tab-own" class="w-full max-w-xs py-2 px-4 rounded-lg font-bold text-sm uppercase bg-indigo-600 text-white">Minhas Dívidas</button>
+                <button onclick="app.switchTab('shared')" id="tab-shared" class="w-full max-w-xs py-2 px-4 rounded-lg font-bold text-sm uppercase bg-white text-slate-600">Com. pra mim</button>
+            </div>
+
+            <!-- Dashboard Summary -->
+            <div id="dashboardSummary" class="grid grid-cols-2 gap-3 md:grid-cols-4">
+                <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200">
+                    <p class="text-[10px] font-black text-slate-400 uppercase">Total Geral</p>
+                    <p id="sumTotal" class="text-sm font-black text-slate-700">R$ 0,00</p>
+                </div>
+                <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200">
+                    <p class="text-[10px] font-black text-emerald-500 uppercase">Pago</p>
+                    <p id="sumPaid" class="text-sm font-black text-emerald-600">R$ 0,00</p>
+                </div>
+                <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200">
+                    <p class="text-[10px] font-black text-rose-500 uppercase">Pendente</p>
+                    <p id="sumPending" class="text-sm font-black text-rose-600">R$ 0,00</p>
+                </div>
+                <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200">
+                    <p class="text-[10px] font-black text-indigo-500 uppercase">Dívidas</p>
+                    <p id="debtCount" class="text-sm font-black text-indigo-600">0</p>
+                </div>
+            </div>
+
+            <!-- Controls -->
+            <div class="flex flex-col md:flex-row gap-2">
+                <div class="relative flex-1">
+                    <input type="text" id="searchInput" oninput="app.handleSearch()" placeholder="Pesquisar credor ou devedor..." class="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg font-bold text-sm outline-none focus:border-indigo-500 transition-colors">
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">🔍</span>
+                </div>
+                <button onclick="app.toggleGlobalCompact()" id="btnGlobalCompact" class="px-4 py-2 bg-white border border-slate-200 rounded-lg font-bold text-xs uppercase text-slate-600 hover:bg-slate-50">Modo Compacto: OFF</button>
+            </div>
         </div>
     </div>
 
@@ -178,6 +211,17 @@
             <p class="text-sm text-slate-500 font-bold mb-4 text-center">Toque para selecionar</p>
             <div id="userList" class="flex-1 overflow-y-auto space-y-2 max-h-[50vh]"></div>
             <button onclick="app.hideModal('userSelectModal')" class="mt-4 w-full py-3 bg-slate-100 text-slate-600 rounded-lg font-black uppercase text-sm">Cancelar</button>
+        </div>
+    </div>
+
+    <div id="templatesModal" class="hidden fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="modal-content bg-white w-full max-w-lg rounded-xl p-6 shadow-2xl max-h-[90vh] flex flex-col">
+            <h3 class="text-2xl font-black uppercase text-center mb-2">Templates</h3>
+            <p class="text-sm text-slate-500 font-bold mb-6 text-center italic">Escolha um modelo para agilizar o lançamento</p>
+            <div id="templatesList" class="flex-1 overflow-y-auto space-y-3 pr-2">
+                <!-- Templates will be injected here -->
+            </div>
+            <button onclick="app.hideModal('templatesModal')" class="mt-6 w-full py-4 bg-slate-100 text-slate-600 rounded-xl font-black uppercase text-sm">Fechar</button>
         </div>
     </div>
 

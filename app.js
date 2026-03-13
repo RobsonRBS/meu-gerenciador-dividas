@@ -12,6 +12,8 @@ const app = {
     lastSelectedId: null,
     activeTab: 'own',
     userName: '',
+    globalCompactMode: false,
+    searchQuery: '',
     
     promptCallback: null,
     confirmCallback: null,
@@ -329,6 +331,94 @@ const app = {
         document.getElementById('tab-own').className = tab === 'own' ? activeClass : inactiveClass;
         document.getElementById('tab-shared').className = tab === 'shared' ? activeClass : inactiveClass;
         this.render();
+    },
+
+    toggleGlobalCompact() {
+        this.globalCompactMode = !this.globalCompactMode;
+        const btn = document.getElementById('btnGlobalCompact');
+        btn.innerText = `Modo Compacto: ${this.globalCompactMode ? 'ON' : 'OFF'}`;
+        btn.className = this.globalCompactMode 
+            ? 'px-4 py-2 bg-indigo-600 border border-indigo-600 rounded-lg font-bold text-xs uppercase text-white'
+            : 'px-4 py-2 bg-white border border-slate-200 rounded-lg font-bold text-xs uppercase text-slate-600 hover:bg-slate-50';
+        this.render();
+    },
+
+    handleSearch() {
+        this.searchQuery = document.getElementById('searchInput').value.toLowerCase();
+        this.render();
+    },
+
+    async cloneDebt(debtId) {
+        const source = this.debtsLocal.find(d => d.id === debtId);
+        if (!source) return;
+
+        this.showConfirm(
+            `Deseja clonar esta dívida (${source.creditor} -> ${source.debtor})?`,
+            async () => {
+                this.showLoading();
+                try {
+                    const { error } = await this.supabaseClient.from('debts').insert({
+                        creditor: source.creditor,
+                        debtor: source.debtor,
+                        description: source.description + ' (Cópia)',
+                        total_value: source.total_value,
+                        installments: source.installments.map(i => ({ ...i, status: 'Pendente', paidAt: null })),
+                        creator_id: this.currentUser.id,
+                        shared_with: []
+                    });
+
+                    if (error) throw error;
+                    this.showToast('Dívida clonada!', 'success');
+                    await this.loadDebts();
+                } catch (err) {
+                    this.showToast('Erro ao clonar dívida', 'error');
+                } finally {
+                    this.hideLoading();
+                }
+            }
+        );
+    },
+
+    showTemplatesModal() {
+        const templates = [
+            { name: "Aluguel", creditor: "Imobiliária", debtor: "Eu", desc: "Pagamento mensal do aluguel", value: 1500, inst: 12 },
+            { name: "Cartão de Crédito", creditor: "Banco", debtor: "Eu", desc: "Fatura do cartão", value: 500, inst: 1 },
+            { name: "Empréstimo Amigo", creditor: "Amigo", debtor: "Eu", desc: "Acerto de empréstimo", value: 100, inst: 5 },
+            { name: "Serviço Prestado", creditor: "Eu", debtor: "Cliente X", desc: "Consultoria mensal", value: 2000, inst: 3 }
+        ];
+
+        const list = document.getElementById('templatesList');
+        list.innerHTML = templates.map(t => `
+            <div onclick="app.applyTemplate(${JSON.stringify(t).replace(/"/g, '&quot;')})" class="p-4 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-indigo-50 hover:border-indigo-300 transition-all group">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h4 class="font-black text-slate-800 uppercase">${t.name}</h4>
+                        <p class="text-xs text-slate-500 font-bold">${t.creditor} → ${t.debtor}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-sm font-black text-indigo-600">R$ ${t.value.toFixed(2)}</p>
+                        <p class="text-[10px] text-slate-400 font-bold">${t.inst}x parcelas</p>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+
+        this.showModal('templatesModal');
+    },
+
+    applyTemplate(tpl) {
+        this.hideModal('templatesModal');
+        document.getElementById('creditor').value = tpl.creditor;
+        document.getElementById('debtor').value = tpl.debtor;
+        document.getElementById('description').value = tpl.desc;
+        document.getElementById('totalValue').value = tpl.value;
+        document.getElementById('installmentsCount').value = tpl.inst;
+        
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        document.getElementById('firstDueDate').value = now.toISOString().slice(0, 16);
+        
+        this.showModal('debtModal');
     },
 
     getCreatorName(creatorId) {
@@ -1051,20 +1141,42 @@ const app = {
         const main = document.getElementById('debtList');
         main.innerHTML = '';
 
-        // Filtrar dívidas baseado na aba ativa
+        // Filtrar por aba e busca
         let debtsToShow = this.debtsLocal;
         if (this.activeTab === 'own') {
-            // Minhas dívidas + as que eu compartilhei
             debtsToShow = this.debtsLocal.filter(d => d.creator_id === this.currentUser.id);
         } else if (this.activeTab === 'shared') {
-            // Dívidas compartilhadas COMIGO
             debtsToShow = this.debtsLocal.filter(d => d.creator_id && d.creator_id !== this.currentUser.id);
         }
 
+        if (this.searchQuery) {
+            debtsToShow = debtsToShow.filter(d => 
+                d.creditor.toLowerCase().includes(this.searchQuery) || 
+                d.debtor.toLowerCase().includes(this.searchQuery) ||
+                (d.description && d.description.toLowerCase().includes(this.searchQuery))
+            );
+        }
+
+        // Atualizar Dashboard Totais
+        let sumTotal = 0, sumPaid = 0, sumPending = 0;
+        debtsToShow.forEach(d => {
+            sumTotal += parseFloat(d.total_value);
+            d.installments.forEach(i => {
+                const val = parseFloat(i.value);
+                if (i.status === 'Pago') sumPaid += val;
+                else sumPending += val;
+            });
+        });
+
+        document.getElementById('sumTotal').innerText = `R$ ${sumTotal.toFixed(2)}`;
+        document.getElementById('sumPaid').innerText = `R$ ${sumPaid.toFixed(2)}`;
+        document.getElementById('sumPending').innerText = `R$ ${sumPending.toFixed(2)}`;
+        document.getElementById('debtCount').innerText = debtsToShow.length;
+
         if (debtsToShow.length === 0) {
             main.innerHTML = `<div class="col-span-full text-center py-20 text-slate-400">
-                <p class="font-black text-2xl uppercase tracking-widest">${this.activeTab === 'own' ? 'Sem dívidas' : 'Sem dívidas compartilhadas'}</p>
-                <p class="text-sm font-bold mt-2 opacity-50">Tudo limpo por aqui! ✨</p>
+                <p class="font-black text-2xl uppercase tracking-widest">${this.activeTab === 'own' ? 'Sem resultados' : 'Sem dívidas compartilhadas'}</p>
+                <p class="text-sm font-bold mt-2 opacity-50">Tente outro termo de busca ou mude a aba! ✨</p>
             </div>`;
             return;
         }
@@ -1096,32 +1208,46 @@ const app = {
                 <div class="p-4 cursor-pointer" onclick="app.toggleExpand('${d.id}')">
                     ${iSharedWithOthers ? '<div class="bg-green-50 text-green-600 text-[10px] font-bold uppercase py-1 px-2 rounded mb-2">Enviada para</div>' : ''}
                     ${isSharedWithMe ? `<div class="bg-blue-50 text-blue-600 text-[10px] font-bold uppercase py-1 px-2 rounded mb-2">De: ${creatorName}</div>` : ''}
-                    <div class="flex justify-between items-start mb-2">
-                        <div>
-                            <h3 class="font-black text-slate-800 uppercase text-2xl leading-tight">${safeDebt.creditor}</h3>
-                            <p class="text-base font-black text-slate-400 uppercase tracking-widest">${safeDebt.debtor}</p>
+                    <div class="flex justify-between items-start ${this.globalCompactMode && !isExp ? 'mb-0' : 'mb-2'}">
+                        <div class="flex-1 min-w-0 pr-2">
+                            <h3 class="${this.globalCompactMode && !isExp ? 'text-lg' : 'text-2xl'} font-black text-slate-800 uppercase leading-tight truncate">${safeDebt.creditor}</h3>
+                            <p class="${this.globalCompactMode && !isExp ? 'text-xs truncate' : 'text-base uppercase tracking-widest'} font-black text-slate-400">${safeDebt.debtor}</p>
                         </div>
-                        <p class="text-lg font-black text-indigo-600 italic">R$ ${totalVal.toFixed(2)}</p>
+                        <div class="text-right">
+                             <p class="${this.globalCompactMode && !isExp ? 'text-base' : 'text-lg italic'} font-black text-indigo-600 whitespace-nowrap">R$ ${totalVal.toFixed(2)}</p>
+                             ${(this.globalCompactMode && !isExp && canEdit) ? `
+                                <div class="flex gap-2 mt-1 justify-end opacity-40 hover:opacity-100 transition-opacity">
+                                    <button onclick="event.stopPropagation(); app.cloneDebt('${d.id}')" title="Clonar" class="text-xs">👯</button>
+                                    <button onclick="event.stopPropagation(); app.exportMobilePDF('${d.id}')" title="PDF" class="text-xs">📄</button>
+                                    <button onclick="event.stopPropagation(); app.deleteDebt('${d.id}')" title="Excluir" class="text-xs">🗑️</button>
+                                    <button onclick="event.stopPropagation(); app.toggleExpand('${d.id}')" title="Detalhes" class="text-xs">🔍</button>
+                                </div>
+                             ` : ''}
+                        </div>
                     </div>
-                    ${safeDebt.description ? `<p class="text-sm font-bold text-slate-500 mb-4 bg-slate-50 p-3 rounded-xl">${safeDebt.description}</p>` : ''}
-                    <div class="grid grid-cols-2 gap-3">
-                        <div class="bg-emerald-50 p-4 rounded-lg border border-emerald-100">
-                            <p class="text-xs font-black text-emerald-600 uppercase">Pago</p>
-                            <p class="text-xl font-black text-emerald-700 leading-none">R$ ${paidVal.toFixed(2)}</p>
+                    
+                    ${(!this.globalCompactMode || isExp) ? `
+                        ${safeDebt.description ? `<p class="text-sm font-bold text-slate-500 mb-4 bg-slate-50 p-3 rounded-xl">${safeDebt.description}</p>` : ''}
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="bg-emerald-50 p-4 rounded-lg border border-emerald-100">
+                                <p class="text-xs font-black text-emerald-600 uppercase">Pago</p>
+                                <p class="text-xl font-black text-emerald-700 leading-none">R$ ${paidVal.toFixed(2)}</p>
+                            </div>
+                            <div class="bg-rose-50 p-4 rounded-lg border border-rose-100">
+                                <p class="text-xs font-black text-rose-600 uppercase">Restante</p>
+                                <p class="text-xl font-black text-rose-700 leading-none">R$ ${(totalVal - paidVal).toFixed(2)}</p>
+                            </div>
                         </div>
-                        <div class="bg-rose-50 p-4 rounded-lg border border-rose-100">
-                            <p class="text-xs font-black text-rose-600 uppercase">Restante</p>
-                            <p class="text-xl font-black text-rose-700 leading-none">R$ ${(totalVal - paidVal).toFixed(2)}</p>
-                        </div>
-                    </div>
+                    ` : ''}
                 </div>
 
                 <div class="${isExp ? 'block' : 'hidden'} bg-slate-50 border-t border-slate-200 p-5 space-y-4">
                     ${canEdit ? `
-                    <div class="grid grid-cols-3 gap-2">
-                        <button onclick="app.exportMobilePDF('${d.id}')" class="py-3 text-black rounded-lg font-black text-xs uppercase tracking-wider" style="background-color: #ffca28;">PDF</button>
-                        <button onclick="app.addInstallment('${d.id}')" class="py-3 bg-indigo-600 text-white rounded-lg font-black text-xs uppercase">+ 1 Parc</button>
-                        <button onclick="app.addMultipleInstallments('${d.id}')" class="py-3 bg-indigo-600 text-white rounded-lg font-black text-xs uppercase">+ Multi</button>
+                    <div class="grid grid-cols-4 gap-2">
+                        <button onclick="app.exportMobilePDF('${d.id}')" title="Exportar PDF" class="py-3 bg-amber-400 text-black rounded-lg font-black text-xs uppercase">PDF</button>
+                        <button onclick="app.cloneDebt('${d.id}')" title="Clonar Dívida" class="py-3 bg-teal-500 text-white rounded-lg font-black text-xs uppercase">Clone</button>
+                        <button onclick="app.addInstallment('${d.id}')" title="Adicionar 1 Parcela" class="py-3 bg-indigo-600 text-white rounded-lg font-black text-xs uppercase">+1</button>
+                        <button onclick="app.addMultipleInstallments('${d.id}')" title="Múltiplas Parcelas" class="py-3 bg-indigo-600 text-white rounded-lg font-black text-xs uppercase">+Multi</button>
                     </div>
                     <div class="grid grid-cols-2 gap-2">
                         <button onclick="app.shareDebt('${d.id}')" class="py-3 bg-white border border-slate-300 text-slate-600 rounded-xl font-black text-[10px] uppercase">${(d.shared_with || []).length > 0 ? `Compartilhado (${d.shared_with.length})` : 'Compartilhar'}</button>
@@ -1129,11 +1255,13 @@ const app = {
                     </div>
 
                     <div class="flex gap-2 flex-wrap">
-                        <button onclick="app.toggleSelectionMode('${d.id}')" class="py-2 px-3 bg-slate-200 text-slate-700 rounded-lg font-black text-xs uppercase">Selecionar</button>
                         <button onclick="app.selectPendingInDebt('${d.id}')" class="py-2 px-3 bg-amber-100 text-amber-700 rounded-lg font-black text-xs uppercase">Pendentes</button>
                         <button onclick="app.selectAllInDebt('${d.id}')" class="py-2 px-3 bg-blue-100 text-blue-700 rounded-lg font-black text-xs uppercase">Todas</button>
                         <button onclick="app.clearSelectionInDebt('${d.id}')" class="py-2 px-3 bg-slate-100 text-slate-500 rounded-lg font-black text-xs uppercase">Limpar</button>
-                        ${this.selectedInstallments.size > 0 ? `<button onclick="app.markSelectedAsPaid('${d.id}')" class="py-2 px-3 bg-emerald-500 text-white rounded-lg font-black text-xs uppercase">Pagar (${this.selectedInstallments.size})</button>` : ''}
+                        ${this.selectedInstallments.size > 0 ? `
+                            <button onclick="app.markSelectedAsPaid('${d.id}')" class="py-2 px-3 bg-emerald-500 text-white rounded-lg font-black text-xs uppercase">Pagar (${this.selectedInstallments.size})</button>
+                            <button onclick="app.markSelectedAsPending('${d.id}')" class="py-2 px-3 bg-rose-500 text-white rounded-lg font-black text-xs uppercase">Pendente (${this.selectedInstallments.size})</button>
+                        ` : ''}
                     </div>
 
                     <button onclick="app.toggleCompactMode('${d.id}')" class="w-full py-2 bg-slate-200 text-slate-600 rounded-lg font-bold text-xs uppercase">
@@ -1154,35 +1282,38 @@ const app = {
                                 `</div>`;
                         }
                         return `<div class="space-y-1">
-                        ${d.installments.map(i => `
+                        ${d.installments.map(i => {
+                            const isSelected = this.selectedInstallments.has(`${d.id}_${i.id}`);
+                            return `
                             <div class="relative rounded-lg overflow-hidden">
                                 <div class="swipe-bg-right uppercase">Pago</div>
                                 <div class="swipe-bg-left uppercase">Pendente</div>
-                                <div class="inst-card p-2 flex items-center justify-between border border-slate-200" 
+                                <div class="inst-card p-2 flex items-center justify-between border ${isSelected ? 'border-indigo-500 bg-indigo-50 shadow-inner' : 'border-slate-200'}" 
                                      ontouchstart="app.tS(event)" 
                                      ontouchmove="app.tM(event)" 
                                      ontouchend="app.tE(event, '${d.id}', ${i.id})"
                                      onmousedown="app.tS(event)"
                                      onmousemove="app.tM(event)"
-                                     onmouseup="app.tE(event, '${d.id}', ${i.id})">
+                                     onmouseup="app.tE(event, '${d.id}', ${i.id})"
+                                     onclick="app.toggleInstallmentSelection('${d.id}', ${i.id}, event)">
                                     <div class="flex items-center gap-3">
-                                        <input type="checkbox" 
-                                            onclick="event.stopPropagation(); app.toggleInstallmentSelection('${d.id}', ${i.id}, event)" 
-                                            ${this.selectedInstallments.has('${d.id}_${i.id}') ? 'checked' : ''}
-                                            class="w-5 h-5 accent-indigo-600">
+                                        <div class="w-2 h-10 rounded-full ${i.status === 'Pago' ? 'bg-emerald-400' : 'bg-slate-200'}"></div>
                                         <div>
-                                            <p class="text-lg font-black ${i.status === 'Pago' ? 'text-emerald-500' : 'text-slate-800'} cursor-pointer hover:text-indigo-500" onclick="event.stopPropagation(); app.editInstallmentValue('${d.id}', ${i.id})">R$ ${i.value}</p>
+                                            <p class="text-lg font-black ${i.status === 'Pago' ? 'text-emerald-600' : 'text-slate-800'}">R$ ${i.value}</p>
                                             <div class="flex gap-4 mt-1">
-                                                <p class="text-xs font-bold text-slate-400 cursor-pointer hover:text-indigo-500" onclick="app.editDate('${d.id}', ${i.id}, 'dueDate')">Venc: <span class="underline">${app.formatDateForDisplay(i.dueDate)}</span></p>
-                                                ${i.paidAt ? `<p class="text-xs font-bold text-emerald-400 cursor-pointer hover:text-indigo-500" onclick="app.editDate('${d.id}', ${i.id}, 'paidAt')">Pago: <span class="underline">${app.formatDateTimeForDisplay(i.paidAt)}</span></p>` : ''}
+                                                <p class="text-[10px] font-bold text-slate-400" onclick="event.stopPropagation(); app.editDate('${d.id}', ${i.id}, 'dueDate')">Venc: <span class="underline">${app.formatDateForDisplay(i.dueDate)}</span></p>
+                                                ${i.paidAt ? `<p class="text-[10px] font-bold text-emerald-400" onclick="event.stopPropagation(); app.editDate('${d.id}', ${i.id}, 'paidAt')">Pago: <span class="underline">${app.formatDateTimeForDisplay(i.paidAt)}</span></p>` : ''}
                                             </div>
-                                            ${i.note ? `<div class="text-xs font-bold text-slate-500 mt-1 cursor-pointer hover:text-indigo-500" onclick="app.editInstallmentNote('${d.id}', ${i.id})">📝 ${i.note}</div>` : `<div class="text-xs text-slate-300 mt-1 cursor-pointer hover:text-indigo-500" onclick="app.editInstallmentNote('${d.id}', ${i.id})">+ obs</div>`}
+                                            ${i.note ? `<div class="text-[10px] font-bold text-slate-500 mt-1" onclick="event.stopPropagation(); app.editInstallmentNote('${d.id}', ${i.id})">📝 ${i.note}</div>` : ''}
                                         </div>
                                     </div>
-                                    <button onclick="app.removeInstallment('${d.id}', ${i.id})" class="text-rose-300 p-2 font-black text-xl hover:text-rose-500">✕</button>
+                                    <div class="flex items-center gap-2">
+                                        <button onclick="event.stopPropagation(); app.editInstallmentValue('${d.id}', ${i.id})" class="text-slate-300 p-2 font-black text-xs hover:text-indigo-500">EDIT</button>
+                                        <button onclick="event.stopPropagation(); app.removeInstallment('${d.id}', ${i.id})" class="text-rose-200 p-2 font-black text-xl hover:text-rose-500">✕</button>
+                                    </div>
                                 </div>
                             </div>
-                        `).join('')}
+                        `;}).join('')}
                     </div>`;
                     })()}
                     
@@ -1354,6 +1485,46 @@ const app = {
                 
                 this.selectedInstallments.clear();
                 this.showToast('Parcelas marcadas como pago!', 'success');
+                await this.loadDebts();
+            } catch (err) {
+                this.showToast('Erro ao atualizar parcelas', 'error');
+            } finally {
+                this.hideLoading();
+            }
+        })();
+    },
+
+    markSelectedAsPending(debtId) {
+        if (this.selectedInstallments.size === 0) return;
+
+        const debt = this.debtsLocal.find(d => d.id === debtId);
+        if (!debt) return;
+
+        const newInsts = debt.installments.map(i => {
+            const key = `${debtId}_${i.id}`;
+            if (this.selectedInstallments.has(key) && i.status !== 'Pendente') {
+                return { 
+                    ...i, 
+                    status: 'Pendente', 
+                    paidAt: null
+                };
+            }
+            return i;
+        });
+
+        this.showLoading();
+
+        (async () => {
+            try {
+                const { error } = await this.supabaseClient
+                    .from('debts')
+                    .update({ installments: newInsts })
+                    .eq('id', debtId);
+
+                if (error) throw error;
+                
+                this.selectedInstallments.clear();
+                this.showToast('Parcelas marcadas como pendente!', 'success');
                 await this.loadDebts();
             } catch (err) {
                 this.showToast('Erro ao atualizar parcelas', 'error');
