@@ -536,12 +536,20 @@ const app = {
         const debt = this.debtsLocal.find(d => d.id === debtId);
         if (!debt) return;
 
+        const isCreator = debt.creator_id === this.currentUser.id;
+        let finalStatus = status;
+        
+        // Se quem está marcando como pago NÃO é o criador, entra em modo de confirmação
+        if (status === 'Pago' && !isCreator) {
+            finalStatus = 'Aguardando Confirmação';
+        }
+
         const newInsts = debt.installments.map(i => {
             if (i.id === parseInt(instId)) {
                 return { 
                     ...i, 
-                    status: status, 
-                    paidAt: status === 'Pago' ? new Date().toISOString().slice(0, 16) : null 
+                    status: finalStatus, 
+                    paidAt: finalStatus === 'Pago' ? (i.paidAt || new Date().toISOString().slice(0, 16)) : (finalStatus === 'Aguardando Confirmação' ? new Date().toISOString().slice(0, 16) : null)
                 };
             }
             return i;
@@ -556,9 +564,42 @@ const app = {
                 .eq('id', debtId);
 
             if (error) throw error;
+            
+            if (finalStatus === 'Aguardando Confirmação') {
+                this.showToast('Enviado para confirmação do credor!', 'info');
+            }
+            
             await this.loadDebts();
         } catch (err) {
             this.showToast('Erro ao atualizar status', 'error');
+        } finally {
+            this.hideLoading();
+        }
+    },
+
+    async confirmPayment(debtId, instId) {
+        const debt = this.debtsLocal.find(d => d.id === debtId);
+        if (!debt) return;
+
+        const newInsts = debt.installments.map(i => {
+            if (i.id === parseInt(instId)) {
+                return { ...i, status: 'Pago' };
+            }
+            return i;
+        });
+
+        this.showLoading();
+        try {
+            const { error } = await this.supabaseClient
+                .from('debts')
+                .update({ installments: newInsts })
+                .eq('id', debtId);
+
+            if (error) throw error;
+            this.showToast('Pagamento confirmado!', 'success');
+            await this.loadDebts();
+        } catch (err) {
+            this.showToast('Erro ao confirmar', 'error');
         } finally {
             this.hideLoading();
         }
@@ -1214,7 +1255,10 @@ const app = {
                             <p class="${this.globalCompactMode && !isExp ? 'text-xs truncate' : 'text-base uppercase tracking-widest'} font-black text-slate-400">${safeDebt.debtor}</p>
                         </div>
                         <div class="text-right">
-                             <p class="${this.globalCompactMode && !isExp ? 'text-base' : 'text-lg italic'} font-black text-indigo-600 whitespace-nowrap">R$ ${totalVal.toFixed(2)}</p>
+                             <div class="flex flex-col items-end">
+                                <p class="${this.globalCompactMode && !isExp ? 'text-base' : 'text-lg italic'} font-black text-indigo-600 whitespace-nowrap">R$ ${totalVal.toFixed(2)}</p>
+                                ${d.installments.some(i => i.status === 'Aguardando Confirmação') ? '<span class="text-[9px] bg-amber-500 text-white px-1 rounded font-black animate-pulse mt-0.5">PENDENTE DE CONFIRMAÇÃO</span>' : ''}
+                             </div>
                              ${(this.globalCompactMode && !isExp && canEdit) ? `
                                 <div class="flex gap-2 mt-1 justify-end opacity-40 hover:opacity-100 transition-opacity">
                                     <button onclick="event.stopPropagation(); app.cloneDebt('${d.id}')" title="Clonar" class="text-xs">👯</button>
@@ -1288,7 +1332,7 @@ const app = {
                             <div class="relative rounded-lg overflow-hidden">
                                 <div class="swipe-bg-right uppercase">Pago</div>
                                 <div class="swipe-bg-left uppercase">Pendente</div>
-                                <div class="inst-card p-2 flex items-center justify-between border ${isSelected ? 'border-indigo-500 bg-indigo-50 shadow-inner' : 'border-slate-200'}" 
+                                <div class="inst-card p-2 flex items-center justify-between border ${isSelected ? 'border-indigo-500 bg-indigo-50 shadow-inner' : (i.status === 'Aguardando Confirmação' ? 'border-amber-300 bg-amber-50' : 'border-slate-200')}" 
                                      ontouchstart="app.tS(event)" 
                                      ontouchmove="app.tM(event)" 
                                      ontouchend="app.tE(event, '${d.id}', ${i.id})"
@@ -1297,17 +1341,18 @@ const app = {
                                      onmouseup="app.tE(event, '${d.id}', ${i.id})"
                                      onclick="app.toggleInstallmentSelection('${d.id}', ${i.id}, event)">
                                     <div class="flex items-center gap-3">
-                                        <div class="w-2 h-10 rounded-full ${i.status === 'Pago' ? 'bg-emerald-400' : 'bg-slate-200'}"></div>
+                                        <div class="w-2 h-10 rounded-full ${i.status === 'Pago' ? 'bg-emerald-400' : (i.status === 'Aguardando Confirmação' ? 'bg-amber-400' : 'bg-slate-200')}"></div>
                                         <div>
-                                            <p class="text-lg font-black ${i.status === 'Pago' ? 'text-emerald-600' : 'text-slate-800'}">R$ ${i.value}</p>
+                                            <p class="text-lg font-black ${i.status === 'Pago' ? 'text-emerald-600' : (i.status === 'Aguardando Confirmação' ? 'text-amber-600' : 'text-slate-800')}">R$ ${i.value}</p>
                                             <div class="flex gap-4 mt-1">
                                                 <p class="text-[10px] font-bold text-slate-400" onclick="event.stopPropagation(); app.editDate('${d.id}', ${i.id}, 'dueDate')">Venc: <span class="underline">${app.formatDateForDisplay(i.dueDate)}</span></p>
-                                                ${i.paidAt ? `<p class="text-[10px] font-bold text-emerald-400" onclick="event.stopPropagation(); app.editDate('${d.id}', ${i.id}, 'paidAt')">Pago: <span class="underline">${app.formatDateTimeForDisplay(i.paidAt)}</span></p>` : ''}
+                                                ${(i.paidAt || i.status === 'Aguardando Confirmação') ? `<p class="text-[10px] font-bold text-emerald-400">Enviado: <span class="underline">${app.formatDateTimeForDisplay(i.paidAt)}</span></p>` : ''}
                                             </div>
-                                            ${i.note ? `<div class="text-[10px] font-bold text-slate-500 mt-1" onclick="event.stopPropagation(); app.editInstallmentNote('${d.id}', ${i.id})">📝 ${i.note}</div>` : ''}
+                                            ${i.status === 'Aguardando Confirmação' ? `<div class="text-[10px] font-black text-amber-500 uppercase mt-1">⚠️ Aguardando credor confirmar</div>` : (i.note ? `<div class="text-[10px] font-bold text-slate-500 mt-1" onclick="event.stopPropagation(); app.editInstallmentNote('${d.id}', ${i.id})">📝 ${i.note}</div>` : '')}
                                         </div>
                                     </div>
                                     <div class="flex items-center gap-2">
+                                        ${(i.status === 'Aguardando Confirmação' && canEdit) ? `<button onclick="event.stopPropagation(); app.confirmPayment('${d.id}', ${i.id})" class="bg-emerald-500 text-white px-3 py-1 rounded text-[10px] font-black hover:bg-emerald-600 transition">CONFIRMAR</button>` : ''}
                                         <button onclick="event.stopPropagation(); app.editInstallmentValue('${d.id}', ${i.id})" class="text-slate-300 p-2 font-black text-xs hover:text-indigo-500">EDIT</button>
                                         <button onclick="event.stopPropagation(); app.removeInstallment('${d.id}', ${i.id})" class="text-rose-200 p-2 font-black text-xl hover:text-rose-500">✕</button>
                                     </div>
