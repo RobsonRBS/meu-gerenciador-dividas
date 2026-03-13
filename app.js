@@ -71,6 +71,42 @@ const app = {
         setTimeout(() => toast.remove(), 3000);
     },
 
+    showResetPasswordModal() {
+        document.getElementById('resetEmail').value = document.getElementById('email').value;
+        document.getElementById('resetError').classList.add('hidden');
+        this.showModal('resetPasswordModal');
+    },
+
+    async resetPassword() {
+        const email = document.getElementById('resetEmail').value.trim();
+        const errorEl = document.getElementById('resetError');
+        
+        if (!this.validateEmail(email)) {
+            errorEl.textContent = 'Email inválido';
+            errorEl.classList.remove('hidden');
+            return;
+        }
+
+        this.showLoading();
+        try {
+            const { error } = await this.supabaseClient.auth.resetPasswordForEmail(email, {
+                redirectTo: window.location.origin + '/'
+            });
+
+            if (error) {
+                errorEl.textContent = error.message;
+                errorEl.classList.remove('hidden');
+            } else {
+                this.hideModal('resetPasswordModal');
+                this.showToast('Email de recuperação enviado!', 'success');
+            }
+        } catch (err) {
+            this.showToast('Erro ao enviar email', 'error');
+        } finally {
+            this.hideLoading();
+        }
+    },
+
     showModal(id) {
         document.getElementById(id).classList.remove('hidden');
     },

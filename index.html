@@ -28,7 +28,21 @@
                 <button onclick="app.handleAuth('login')" class="flex-1 bg-indigo-600 py-5 rounded-lg font-black text-lg uppercase">Entrar</button>
                 <button onclick="app.handleAuth('signup')" class="flex-1 bg-slate-800 py-5 rounded-lg font-black text-sm uppercase">Criar</button>
             </div>
+            <button onclick="app.showResetPasswordModal()" class="text-slate-400 text-sm font-bold hover:text-white underline">Esqueci a senha</button>
             <p id="authError" class="text-red-400 text-sm font-bold hidden"></p>
+        </div>
+    </div>
+
+    <div id="resetPasswordModal" class="hidden fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-sm rounded-lg p-6 shadow-2xl">
+            <h3 class="text-xl font-black uppercase text-center mb-4 text-slate-800">Recuperar Senha</h3>
+            <p class="text-sm text-slate-500 font-bold mb-4 text-center">Digite seu email para receber o link de recuperação</p>
+            <input type="email" id="resetEmail" placeholder="Seu email" class="w-full p-4 bg-slate-100 rounded-xl font-bold text-lg outline-none mb-4">
+            <p id="resetError" class="text-red-500 text-xs font-bold mb-2 hidden"></p>
+            <div class="flex gap-3">
+                <button onclick="app.hideModal('resetPasswordModal')" class="flex-1 py-4 bg-slate-100 text-slate-600 rounded-xl font-black uppercase text-sm">Cancelar</button>
+                <button onclick="app.resetPassword()" class="flex-1 py-4 bg-indigo-600 text-white rounded-xl font-black uppercase text-sm">Enviar</button>
+            </div>
         </div>
     </div>
 
