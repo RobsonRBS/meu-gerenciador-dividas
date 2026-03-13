@@ -229,27 +229,27 @@ const app = {
 
     async loadUsers() {
         try {
-            let { data, error } = await this.supabaseClient
+            let users = [];
+            
+            // Tentar buscar da tabela profiles
+            let { data: profilesData, error: profilesError } = await this.supabaseClient
                 .from('profiles')
                 .select('id, email');
             
-            console.log('Profiles data:', data, error);
-            
-            if (!data || data.length === 0) {
-                console.log('Profiles vazio, buscando de auth.users...');
-                const { data: authData } = await this.supabaseClient
-                    .from('auth.users')
-                    .select('id, email');
-                
-                if (authData) {
-                    console.log('Auth users:', authData);
-                    this.usersList = authData.filter(u => u.id !== this.currentUser?.id);
-                }
-            } else {
-                this.usersList = data.filter(u => u.id !== this.currentUser?.id);
+            if (profilesData && profilesData.length > 0) {
+                users = profilesData;
             }
             
-            console.log('Users list:', this.usersList);
+            // Se não encontrou, buscar de auth.users via API
+            if (users.length === 0) {
+                const { data: authData } = await this.supabaseClient.auth.getUser();
+                if (authData?.user) {
+                    users = [{ id: authData.user.id, email: authData.user.email }];
+                }
+            }
+            
+            this.usersList = users.filter(u => u.id !== this.currentUser?.id);
+            console.log('Users loaded:', this.usersList);
         } catch (err) {
             console.log('Erro ao carregar usuários:', err);
             this.usersList = [];
