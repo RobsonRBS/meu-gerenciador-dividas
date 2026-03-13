@@ -32,7 +32,12 @@ const app = {
                 this.loadUsers();
                 this.loadUserName();
                 document.getElementById('loginScreen').classList.add('hidden');
+                this.subscribeToDebts();
             } else {
+                if (this.debtSubscription) {
+                    this.debtSubscription.unsubscribe();
+                    this.debtSubscription = null;
+                }
                 document.getElementById('loginScreen').classList.remove('hidden');
             }
         });
@@ -274,6 +279,21 @@ const app = {
 
     validateEmail(email) {
         return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    },
+
+    subscribeToDebts() {
+        if (this.debtSubscription) return;
+        
+        this.debtSubscription = this.supabaseClient
+            .channel('debts_changes')
+            .on('postgres_changes', { 
+                event: '*', 
+                schema: 'public', 
+                table: 'debts' 
+            }, () => {
+                this.loadDebts();
+            })
+            .subscribe();
     },
 
     async loadDebts() {
@@ -1299,13 +1319,19 @@ const app = {
         }
 
         // Atualizar Dashboard Totais
-        let sumTotal = 0, sumPaid = 0, sumPending = 0;
+        let sumTotal = 0, sumPaid = 0, sumPending = 0, countAwaiting = 0;
         debtsToShow.forEach(d => {
             sumTotal += parseFloat(d.total_value);
+            const isOwner = d.creator_id === this.currentUser.id;
+            
             d.installments.forEach(i => {
                 const val = parseFloat(i.value);
                 if (i.status === 'Pago') sumPaid += val;
                 else sumPending += val;
+                
+                if (i.status === 'Aguardando Confirmação' && isOwner) {
+                    countAwaiting++;
+                }
             });
         });
 
@@ -1313,6 +1339,15 @@ const app = {
         document.getElementById('sumPaid').innerText = `R$ ${sumPaid.toFixed(2)}`;
         document.getElementById('sumPending').innerText = `R$ ${sumPending.toFixed(2)}`;
         document.getElementById('debtCount').innerText = debtsToShow.length;
+        
+        const awaitingContainer = document.getElementById('summaryAwaitingContainer');
+        const awaitingEl = document.getElementById('sumAwaiting');
+        if (countAwaiting > 0) {
+            awaitingContainer.classList.remove('hidden');
+            awaitingEl.innerText = countAwaiting;
+        } else {
+            awaitingContainer.classList.add('hidden');
+        }
 
         if (debtsToShow.length === 0) {
             main.innerHTML = `<div class="col-span-full text-center py-20 text-slate-400">
@@ -1334,8 +1369,12 @@ const app = {
                 .reduce((acc, i) => acc + parseFloat(i.value), 0);
             const totalVal = parseFloat(d.total_value);
 
+            const hasAwaiting = d.installments.some(i => i.status === 'Aguardando Confirmação');
             let cardClass = 'bg-white rounded-2xl shadow-xl shadow-slate-200/50 overflow-hidden flex flex-col h-fit transition-all duration-300 hover:shadow-2xl hover:shadow-indigo-100 ';
-            if (iSharedWithOthers) {
+            
+            if (hasAwaiting && canEdit) {
+                cardClass += 'ring-4 ring-amber-400 animate-pulse ';
+            } else if (iSharedWithOthers) {
                 cardClass += 'border-2 border-green-400';
             } else if (isSharedWithMe) {
                 cardClass += 'border-2 border-blue-400';

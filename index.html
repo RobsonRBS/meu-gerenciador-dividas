@@ -120,18 +120,22 @@
             </div>
 
             <!-- Dashboard Summary -->
-            <div id="dashboardSummary" class="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <div id="dashboardSummary" class="grid grid-cols-2 gap-3 md:grid-cols-5">
                 <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200">
                     <p class="text-[10px] font-black text-slate-400 uppercase">Total Geral</p>
                     <p id="sumTotal" class="text-sm font-black text-slate-700">R$ 0,00</p>
                 </div>
-                <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200">
+                <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200 border-l-4 border-l-emerald-400">
                     <p class="text-[10px] font-black text-emerald-500 uppercase">Pago</p>
                     <p id="sumPaid" class="text-sm font-black text-emerald-600">R$ 0,00</p>
                 </div>
-                <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200">
+                <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200 border-l-4 border-l-rose-400">
                     <p class="text-[10px] font-black text-rose-500 uppercase">Pendente</p>
                     <p id="sumPending" class="text-sm font-black text-rose-600">R$ 0,00</p>
+                </div>
+                <div id="summaryAwaitingContainer" class="bg-amber-50 p-3 rounded-xl shadow-sm border border-amber-200 border-l-4 border-l-amber-500 hidden animate-pulse">
+                    <p class="text-[10px] font-black text-amber-600 uppercase">Para Confirmar</p>
+                    <p id="sumAwaiting" class="text-sm font-black text-amber-700">0</p>
                 </div>
                 <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200">
                     <p class="text-[10px] font-black text-indigo-500 uppercase">Dívidas</p>
