@@ -19,12 +19,16 @@ body {
 }
 
 .inst-card {
-    transition: transform 0.2s ease;
+    transition: all 0.2s ease;
     position: relative;
     z-index: 10;
     background: white;
     cursor: pointer;
     min-height: 70px;
+}
+
+.inst-card:hover {
+    background: #f8fafc;
 }
 
 .swipe-bg-right {
@@ -162,4 +166,29 @@ input[type="time"]::-webkit-calendar-picker-indicator,
 input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     filter: invert(0.5);
     cursor: pointer;
+}
+
+/* Modal Improvements */
+@media (min-width: 768px) {
+    .modal-content {
+        max-width: 500px !important;
+    }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
 }

@@ -323,8 +323,11 @@ const app = {
 
     switchTab(tab) {
         this.activeTab = tab;
-        document.getElementById('tab-own').className = tab === 'own' ? 'flex-1 py-2 px-4 rounded-lg font-bold text-sm uppercase bg-indigo-600 text-white' : 'flex-1 py-2 px-4 rounded-lg font-bold text-sm uppercase bg-white text-slate-600';
-        document.getElementById('tab-shared').className = tab === 'shared' ? 'flex-1 py-2 px-4 rounded-lg font-bold text-sm uppercase bg-indigo-600 text-white' : 'flex-1 py-2 px-4 rounded-lg font-bold text-sm uppercase bg-white text-slate-600';
+        const activeClass = 'w-full max-w-xs py-2 px-4 rounded-lg font-bold text-sm uppercase bg-indigo-600 text-white';
+        const inactiveClass = 'w-full max-w-xs py-2 px-4 rounded-lg font-bold text-sm uppercase bg-white text-slate-600';
+        
+        document.getElementById('tab-own').className = tab === 'own' ? activeClass : inactiveClass;
+        document.getElementById('tab-shared').className = tab === 'shared' ? activeClass : inactiveClass;
         this.render();
     },
 
@@ -1059,8 +1062,9 @@ const app = {
         }
 
         if (debtsToShow.length === 0) {
-            main.innerHTML = `<div class="text-center py-8 text-slate-400">
-                <p class="font-bold">${this.activeTab === 'own' ? 'Nenhuma dívida' : 'Nenhuma dívida compartilhada'}</p>
+            main.innerHTML = `<div class="col-span-full text-center py-20 text-slate-400">
+                <p class="font-black text-2xl uppercase tracking-widest">${this.activeTab === 'own' ? 'Sem dívidas' : 'Sem dívidas compartilhadas'}</p>
+                <p class="text-sm font-bold mt-2 opacity-50">Tudo limpo por aqui! ✨</p>
             </div>`;
             return;
         }
@@ -1077,13 +1081,13 @@ const app = {
                 .reduce((acc, i) => acc + parseFloat(i.value), 0);
             const totalVal = parseFloat(d.total_value);
 
-            let cardClass = 'bg-white rounded-xl shadow-md overflow-hidden ';
+            let cardClass = 'bg-white rounded-2xl shadow-xl shadow-slate-200/50 overflow-hidden flex flex-col h-fit transition-all duration-300 hover:shadow-2xl hover:shadow-indigo-100 ';
             if (iSharedWithOthers) {
-                cardClass += 'border-2 border-green-400'; // verde - dividas que eu compartilhei
+                cardClass += 'border-2 border-green-400';
             } else if (isSharedWithMe) {
-                cardClass += 'border-2 border-blue-300'; // azul - dividas compartilhadas comigo
+                cardClass += 'border-2 border-blue-400';
             } else {
-                cardClass += 'border border-slate-200'; // normal
+                cardClass += 'border border-slate-100';
             }
 
             const card = document.createElement('div');

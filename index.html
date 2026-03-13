@@ -13,7 +13,7 @@
 <body class="pb-40">
 
     <div id="loginScreen" class="fixed inset-0 z-[100] bg-slate-900 flex items-center justify-center p-6 text-white hidden">
-        <div class="max-w-sm w-full space-y-6 text-center">
+        <div class="modal-content max-w-sm w-full space-y-6 text-center">
             <h1 class="text-5xl font-black italic mb-8 uppercase tracking-tighter">DebtFlow</h1>
             <input type="email" id="email" placeholder="Email" class="w-full p-5 rounded-lg text-slate-900 font-bold text-lg outline-none">
             <input type="password" id="password" placeholder="Senha" class="w-full p-5 rounded-lg text-slate-900 font-bold text-lg outline-none">
@@ -27,7 +27,7 @@
     </div>
 
     <div id="resetPasswordModal" class="hidden fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-white w-full max-w-sm rounded-lg p-6 shadow-2xl">
+        <div class="modal-content bg-white w-full max-w-sm rounded-lg p-6 shadow-2xl">
             <h3 class="text-xl font-black uppercase text-center mb-4 text-slate-800">Recuperar Senha</h3>
             <p class="text-sm text-slate-500 font-bold mb-4 text-center">Digite seu email para receber o link de recuperação</p>
             <input type="email" id="resetEmail" placeholder="Seu email" class="w-full p-4 bg-slate-100 rounded-xl font-bold text-lg outline-none mb-4">
@@ -39,20 +39,22 @@
         </div>
     </div>
 
-    <header class="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 px-6 py-5 flex justify-between items-center">
-        <div>
-            <h1 class="text-2xl font-black tracking-tighter uppercase leading-none">DebtFlow</h1>
-            <p id="userEmail" class="text-[10px] font-black text-slate-400 mt-1 uppercase tracking-widest"></p>
-        </div>
-        <div class="flex gap-2">
-            <button onclick="app.showSettingsModal()" class="p-2 text-slate-400 font-bold text-sm">⚙️</button>
-            <button onclick="app.logout()" class="p-2 text-slate-400 font-bold text-sm">SAIR</button>
-            <button onclick="app.showModal('debtModal')" class="bg-indigo-600 text-white w-12 h-12 rounded-lg shadow-lg flex items-center justify-center font-bold text-2xl">+</button>
+    <header class="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 px-6 py-5">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div>
+                <h1 class="text-2xl md:text-3xl font-black tracking-tighter uppercase leading-none">DebtFlow</h1>
+                <p id="userEmail" class="text-[10px] md:text-xs font-black text-slate-400 mt-1 uppercase tracking-widest"></p>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="app.showSettingsModal()" class="p-2 text-slate-400 font-bold text-sm">⚙️</button>
+                <button onclick="app.logout()" class="p-2 text-slate-400 font-bold text-sm">SAIR</button>
+                <button onclick="app.showModal('debtModal')" class="bg-indigo-600 text-white w-12 h-12 rounded-lg shadow-lg flex items-center justify-center font-bold text-2xl hover:bg-indigo-700 transition-colors shadow-indigo-200">+</button>
+            </div>
         </div>
     </header>
 
     <div id="settingsModal" class="hidden fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-white w-full max-w-sm rounded-lg p-6 shadow-2xl">
+        <div class="modal-content bg-white w-full max-w-sm rounded-lg p-6 shadow-2xl">
             <h3 class="text-xl font-black uppercase text-center mb-4 text-slate-800">Configurações</h3>
             <div class="space-y-3">
                 <button onclick="app.showEditNameModal()" class="w-full py-3 bg-slate-100 text-slate-700 rounded-lg font-bold text-left px-4">👤 Alterar Nome</button>
@@ -63,7 +65,7 @@
     </div>
 
     <div id="editNameModal" class="hidden fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-white w-full max-w-sm rounded-lg p-6 shadow-2xl">
+        <div class="modal-content bg-white w-full max-w-sm rounded-lg p-6 shadow-2xl">
             <h3 class="text-xl font-black uppercase text-center mb-4 text-slate-800">Seu Nome</h3>
             <input type="text" id="userDisplayName" placeholder="Digite seu nome" class="w-full p-4 bg-slate-100 rounded-xl font-bold text-lg mb-4 outline-none">
             <p class="text-xs text-slate-500 mb-4">Este nome será visível para outros usuários</p>
@@ -76,7 +78,7 @@
     </div>
 
     <div id="changePasswordModal" class="hidden fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-white w-full max-w-sm rounded-lg p-6 shadow-2xl">
+        <div class="modal-content bg-white w-full max-w-sm rounded-lg p-6 shadow-2xl">
             <h3 class="text-xl font-black uppercase text-center mb-4 text-slate-800">Nova Senha</h3>
             <input type="password" id="newPassword" placeholder="Nova senha" class="w-full p-4 bg-slate-100 rounded-xl font-bold text-lg mb-4 outline-none">
             <input type="password" id="confirmPassword" placeholder="Confirmar senha" class="w-full p-4 bg-slate-100 rounded-xl font-bold text-lg mb-4 outline-none">
@@ -96,16 +98,16 @@
     </div>
 
     <div class="sticky top-[73px] z-30 bg-slate-100 border-b border-slate-200 px-4 py-2">
-        <div class="max-w-xl mx-auto flex gap-2">
-            <button onclick="app.switchTab('own')" id="tab-own" class="flex-1 py-2 px-4 rounded-lg font-bold text-sm uppercase bg-indigo-600 text-white">Minhas Dívidas</button>
-            <button onclick="app.switchTab('shared')" id="tab-shared" class="flex-1 py-2 px-4 rounded-lg font-bold text-sm uppercase bg-white text-slate-600">Com. pra mim</button>
+        <div class="max-w-7xl mx-auto flex justify-center gap-2">
+            <button onclick="app.switchTab('own')" id="tab-own" class="w-full max-w-xs py-2 px-4 rounded-lg font-bold text-sm uppercase bg-indigo-600 text-white">Minhas Dívidas</button>
+            <button onclick="app.switchTab('shared')" id="tab-shared" class="w-full max-w-xs py-2 px-4 rounded-lg font-bold text-sm uppercase bg-white text-slate-600">Com. pra mim</button>
         </div>
     </div>
 
-    <main id="debtList" class="p-4 max-w-xl mx-auto space-y-6"></main>
+    <main id="debtList" class="p-4 max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></main>
 
     <div id="debtModal" class="hidden fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <form id="debtForm" class="bg-white w-full max-w-md rounded-xl p-8 space-y-4 shadow-2xl overflow-y-auto max-h-[90vh]">
+        <form id="debtForm" class="modal-content bg-white w-full max-w-md rounded-xl p-8 space-y-4 shadow-2xl overflow-y-auto max-h-[90vh]">
             <h2 class="text-2xl font-black uppercase italic text-center">Novo Registro</h2>
             <div class="grid grid-cols-2 gap-2">
                 <input type="text" id="creditor" placeholder="Credor" class="p-4 bg-slate-100 rounded-xl font-bold text-lg" required>
