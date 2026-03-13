@@ -10,6 +10,7 @@ const app = {
     selectionMode: false,
     compactMode: new Set(),
     lastSelectedId: null,
+    activeTab: 'own',
     
     promptCallback: null,
     confirmCallback: null,
@@ -254,6 +255,18 @@ const app = {
             console.log('Erro ao carregar usuários:', err);
             this.usersList = [];
         }
+    },
+
+    switchTab(tab) {
+        this.activeTab = tab;
+        document.getElementById('tab-own').className = tab === 'own' ? 'flex-1 py-2 px-4 rounded-lg font-bold text-sm uppercase bg-indigo-600 text-white' : 'flex-1 py-2 px-4 rounded-lg font-bold text-sm uppercase bg-white text-slate-600';
+        document.getElementById('tab-shared').className = tab === 'shared' ? 'flex-1 py-2 px-4 rounded-lg font-bold text-sm uppercase bg-indigo-600 text-white' : 'flex-1 py-2 px-4 rounded-lg font-bold text-sm uppercase bg-white text-slate-600';
+        this.render();
+    },
+
+    getCreatorEmail(creatorId) {
+        const user = this.usersList.find(u => u.id === creatorId);
+        return user ? user.email : creatorId;
     },
 
     formatDateForDisplay(dateTimeStr) {
@@ -973,11 +986,27 @@ const app = {
         const main = document.getElementById('debtList');
         main.innerHTML = '';
 
-        this.debtsLocal.forEach(d => {
+        // Filtrar dívidas baseado na aba ativa
+        let debtsToShow = this.debtsLocal;
+        if (this.activeTab === 'own') {
+            debtsToShow = this.debtsLocal.filter(d => d.creator_id === this.currentUser.id);
+        } else if (this.activeTab === 'shared') {
+            debtsToShow = this.debtsLocal.filter(d => d.creator_id && d.creator_id !== this.currentUser.id);
+        }
+
+        if (debtsToShow.length === 0) {
+            main.innerHTML = `<div class="text-center py-8 text-slate-400">
+                <p class="font-bold">${this.activeTab === 'own' ? 'Nenhuma dívida criada' : 'Nenhuma dívida compartilhada'}</p>
+            </div>`;
+            return;
+        }
+
+        debtsToShow.forEach(d => {
             const safeDebt = this.sanitizeDebt(d);
             const isExp = this.expandedIds.has(d.id);
             const canEdit = d.creator_id && d.creator_id === this.currentUser.id;
             const isShared = !canEdit && d.creator_id;
+            const creatorEmail = isShared ? this.getCreatorEmail(d.creator_id) : null;
             const paidVal = d.installments
                 .filter(i => i.status === 'Pago')
                 .reduce((acc, i) => acc + parseFloat(i.value), 0);
@@ -987,7 +1016,7 @@ const app = {
             card.className = `bg-white rounded-xl shadow-md overflow-hidden ${isShared ? 'border-2 border-blue-300' : 'border border-slate-200'}`;
             card.innerHTML = `
                 <div class="p-4 cursor-pointer" onclick="app.toggleExpand('${d.id}')">
-                    ${isShared ? '<div class="bg-blue-50 text-blue-600 text-[10px] font-bold uppercase py-1 px-2 rounded mb-2">Compartilhada</div>' : ''}
+                    ${isShared ? `<div class="bg-blue-50 text-blue-600 text-[10px] font-bold uppercase py-1 px-2 rounded mb-2">De: ${creatorEmail}</div>` : ''}
                     <div class="flex justify-between items-start mb-2">
                         <div>
                             <h3 class="font-black text-slate-800 uppercase text-2xl leading-tight">${safeDebt.creditor}</h3>
