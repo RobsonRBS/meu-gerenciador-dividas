@@ -150,17 +150,12 @@ const app = {
                 .from('profiles')
                 .select('id, email');
             
-            console.log('Users loaded:', data, error);
-            
             if (error) {
-                console.log('Error loading users, trying raw query...');
-                const { data: rawData } = await this.supabaseClient.rpc('get_all_profiles');
-                if (rawData) data = rawData;
+                console.log('Error loading users:', error);
             }
             
             if (data) {
                 this.usersList = data.filter(u => u.id !== this.currentUser?.id);
-                console.log('Users list after filter:', this.usersList);
             }
         } catch (err) {
             console.log('Erro ao carregar usuários:', err);
