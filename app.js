@@ -287,7 +287,6 @@ const app = {
                 .eq('id', debtId);
 
             if (error) throw error;
-            this.showToast(`Parcela marcada como ${status}`, 'success');
             await this.loadDebts();
         } catch (err) {
             this.showToast('Erro ao atualizar status', 'error');
