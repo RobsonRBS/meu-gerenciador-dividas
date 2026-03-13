@@ -11,6 +11,7 @@ const app = {
     compactMode: new Set(),
     lastSelectedId: null,
     activeTab: 'own',
+    userName: '',
     
     promptCallback: null,
     confirmCallback: null,
@@ -27,6 +28,7 @@ const app = {
                 document.getElementById('userEmail').innerText = this.escapeHtml(this.currentUser.email);
                 this.loadDebts();
                 this.loadUsers();
+                this.loadUserName();
                 document.getElementById('loginScreen').classList.add('hidden');
             } else {
                 document.getElementById('loginScreen').classList.remove('hidden');
@@ -119,6 +121,67 @@ const app = {
         document.getElementById('passwordError').classList.add('hidden');
         this.hideModal('settingsModal');
         this.showModal('changePasswordModal');
+    },
+
+    async loadUserName() {
+        try {
+            const { data, error } = await this.supabaseClient
+                .from('profiles')
+                .select('display_name')
+                .eq('id', this.currentUser.id)
+                .single();
+            
+            if (data?.display_name) {
+                this.userName = data.display_name;
+                document.getElementById('userEmail').innerText = this.escapeHtml(this.userName);
+            }
+        } catch (err) {
+            console.log('Erro ao carregar nome:', err);
+        }
+    },
+
+    showEditNameModal() {
+        document.getElementById('userDisplayName').value = this.userName || '';
+        document.getElementById('nameError').classList.add('hidden');
+        this.hideModal('settingsModal');
+        this.showModal('editNameModal');
+    },
+
+    async saveDisplayName() {
+        const name = document.getElementById('userDisplayName').value.trim();
+        const errorEl = document.getElementById('nameError');
+        
+        if (!name) {
+            errorEl.textContent = 'Digite um nome';
+            errorEl.classList.remove('hidden');
+            return;
+        }
+
+        this.showLoading();
+        try {
+            const { error } = await this.supabaseClient
+                .from('profiles')
+                .upsert({
+                    id: this.currentUser.id,
+                    email: this.currentUser.email,
+                    display_name: name
+                }, { onConflict: 'id' });
+
+            if (error) throw error;
+
+            this.userName = name;
+            document.getElementById('userEmail').innerText = this.escapeHtml(name);
+            this.hideModal('editNameModal');
+            this.showToast('Nome salvo!', 'success');
+            
+            // Recarregar lista de usuários
+            this.loadUsers();
+        } catch (err) {
+            errorEl.textContent = 'Erro ao salvar nome';
+            errorEl.classList.remove('hidden');
+        } finally {
+            this.hideLoading();
+        }
     },
 
     async changePassword() {
@@ -236,7 +299,7 @@ const app = {
             // Tentar buscar da tabela profiles
             let { data: profilesData, error: profilesError } = await this.supabaseClient
                 .from('profiles')
-                .select('id, email');
+                .select('id, email, display_name');
             
             if (profilesData && profilesData.length > 0) {
                 users = profilesData;
@@ -246,7 +309,7 @@ const app = {
             if (users.length === 0) {
                 const { data: authData } = await this.supabaseClient.auth.getUser();
                 if (authData?.user) {
-                    users = [{ id: authData.user.id, email: authData.user.email }];
+                    users = [{ id: authData.user.id, email: authData.user.email, display_name: null }];
                 }
             }
             
@@ -265,9 +328,11 @@ const app = {
         this.render();
     },
 
-    getCreatorEmail(creatorId) {
+    getCreatorName(creatorId) {
         const user = this.usersList.find(u => u.id === creatorId);
-        return user ? user.email : creatorId;
+        if (user?.display_name) return user.display_name;
+        if (user?.email) return user.email;
+        return creatorId;
     },
 
     formatDateForDisplay(dateTimeStr) {
@@ -613,11 +678,12 @@ const app = {
             `;
         } else {
             availableUsers.forEach(user => {
+                const displayName = user.display_name || user.email || 'Usuário';
                 const btn = document.createElement('button');
                 btn.className = 'w-full p-3 bg-slate-100 rounded-lg text-left hover:bg-indigo-50 transition';
                 btn.innerHTML = `
-                    <div class="font-bold text-slate-700">${this.escapeHtml(user.email || 'Usuário')}</div>
-                    <div class="text-xs text-slate-400">${user.id}</div>
+                    <div class="font-bold text-slate-700">${this.escapeHtml(displayName)}</div>
+                    <div class="text-xs text-slate-400">${user.email || user.id}</div>
                 `;
                 btn.onclick = () => {
                     this.hideModal('userSelectModal');
@@ -1002,7 +1068,7 @@ const app = {
             const isExp = this.expandedIds.has(d.id);
             const canEdit = d.creator_id && d.creator_id === this.currentUser.id;
             const isShared = !canEdit && d.creator_id;
-            const creatorEmail = isShared ? this.getCreatorEmail(d.creator_id) : null;
+            const creatorName = isShared ? this.getCreatorName(d.creator_id) : null;
             const paidVal = d.installments
                 .filter(i => i.status === 'Pago')
                 .reduce((acc, i) => acc + parseFloat(i.value), 0);
@@ -1012,7 +1078,7 @@ const app = {
             card.className = `bg-white rounded-xl shadow-md overflow-hidden ${isShared ? 'border-2 border-blue-300' : 'border border-slate-200'}`;
             card.innerHTML = `
                 <div class="p-4 cursor-pointer" onclick="app.toggleExpand('${d.id}')">
-                    ${isShared ? `<div class="bg-blue-50 text-blue-600 text-[10px] font-bold uppercase py-1 px-2 rounded mb-2">De: ${creatorEmail}</div>` : ''}
+                    ${isShared ? `<div class="bg-blue-50 text-blue-600 text-[10px] font-bold uppercase py-1 px-2 rounded mb-2">De: ${creatorName}</div>` : ''}
                     <div class="flex justify-between items-start mb-2">
                         <div>
                             <h3 class="font-black text-slate-800 uppercase text-2xl leading-tight">${safeDebt.creditor}</h3>
