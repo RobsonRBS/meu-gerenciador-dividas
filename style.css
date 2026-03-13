@@ -1,0 +1,158 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
+
+:root {
+    --color-primary: #4f46e5;
+    --color-success: #10b981;
+    --color-warning: #f59e0b;
+    --color-danger: #f43f5e;
+    --color-bg: #f3f4f6;
+    --radius-lg: 1.5rem;
+    --radius-xl: 2rem;
+    --radius-full: 3rem;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background: var(--color-bg);
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+}
+
+.inst-card {
+    transition: transform 0.2s ease;
+    position: relative;
+    z-index: 10;
+    background: white;
+    cursor: pointer;
+    min-height: 70px;
+}
+
+.swipe-bg-right {
+    background: var(--color-success);
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    padding-left: 25px;
+    color: white;
+    font-weight: 900;
+    font-size: 18px;
+    border-radius: var(--radius-lg);
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.swipe-bg-left {
+    background: var(--color-warning);
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 25px;
+    color: white;
+    font-weight: 900;
+    font-size: 18px;
+    border-radius: var(--radius-lg);
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.toast {
+    animation: slideIn 0.3s ease, fadeOut 0.3s ease 2.7s;
+    padding: 1rem 1.5rem;
+    border-radius: 1rem;
+    font-weight: 700;
+    font-size: 0.875rem;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.toast-success {
+    background: var(--color-success);
+    color: white;
+}
+
+.toast-error {
+    background: var(--color-danger);
+    color: white;
+}
+
+.toast-info {
+    background: var(--color-primary);
+    color: white;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes fadeOut {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+    }
+}
+
+.input-error {
+    border: 2px solid var(--color-danger) !important;
+}
+
+.hidden {
+    display: none !important;
+}
+
+.fixed {
+    position: fixed;
+}
+
+.inset-0 {
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+}
+
+.bg-white\/95 {
+    background-color: rgba(255, 255, 255, 0.95);
+}
+
+.backdrop-blur-md {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+.backdrop-blur-sm {
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+
+input:focus, textarea:focus, button:focus {
+    outline: none;
+}
+
+input, textarea, button {
+    transition: all 0.2s ease;
+}
+
+input:active, textarea:active {
+    transform: scale(0.98);
+}
+
+button:active {
+    transform: scale(0.95);
+}
