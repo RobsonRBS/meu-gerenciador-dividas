@@ -1051,14 +1051,16 @@ const app = {
         // Filtrar dívidas baseado na aba ativa
         let debtsToShow = this.debtsLocal;
         if (this.activeTab === 'own') {
+            // Minhas dívidas + as que eu compartilhei
             debtsToShow = this.debtsLocal.filter(d => d.creator_id === this.currentUser.id);
         } else if (this.activeTab === 'shared') {
+            // Dívidas compartilhadas COMIGO
             debtsToShow = this.debtsLocal.filter(d => d.creator_id && d.creator_id !== this.currentUser.id);
         }
 
         if (debtsToShow.length === 0) {
             main.innerHTML = `<div class="text-center py-8 text-slate-400">
-                <p class="font-bold">${this.activeTab === 'own' ? 'Nenhuma dívida criada' : 'Nenhuma dívida compartilhada'}</p>
+                <p class="font-bold">${this.activeTab === 'own' ? 'Nenhuma dívida' : 'Nenhuma dívida compartilhada'}</p>
             </div>`;
             return;
         }
@@ -1067,18 +1069,29 @@ const app = {
             const safeDebt = this.sanitizeDebt(d);
             const isExp = this.expandedIds.has(d.id);
             const canEdit = d.creator_id && d.creator_id === this.currentUser.id;
-            const isShared = !canEdit && d.creator_id;
-            const creatorName = isShared ? this.getCreatorName(d.creator_id) : null;
+            const isSharedWithMe = !canEdit && d.creator_id; // dividas compartilhadas COMIGO
+            const iSharedWithOthers = canEdit && d.shared_with && d.shared_with.length > 0; // dividas que eu compartilhei
+            const creatorName = isSharedWithMe ? this.getCreatorName(d.creator_id) : null;
             const paidVal = d.installments
                 .filter(i => i.status === 'Pago')
                 .reduce((acc, i) => acc + parseFloat(i.value), 0);
             const totalVal = parseFloat(d.total_value);
 
+            let cardClass = 'bg-white rounded-xl shadow-md overflow-hidden ';
+            if (iSharedWithOthers) {
+                cardClass += 'border-2 border-green-400'; // verde - dividas que eu compartilhei
+            } else if (isSharedWithMe) {
+                cardClass += 'border-2 border-blue-300'; // azul - dividas compartilhadas comigo
+            } else {
+                cardClass += 'border border-slate-200'; // normal
+            }
+
             const card = document.createElement('div');
-            card.className = `bg-white rounded-xl shadow-md overflow-hidden ${isShared ? 'border-2 border-blue-300' : 'border border-slate-200'}`;
+            card.className = cardClass;
             card.innerHTML = `
                 <div class="p-4 cursor-pointer" onclick="app.toggleExpand('${d.id}')">
-                    ${isShared ? `<div class="bg-blue-50 text-blue-600 text-[10px] font-bold uppercase py-1 px-2 rounded mb-2">De: ${creatorName}</div>` : ''}
+                    ${iSharedWithOthers ? '<div class="bg-green-50 text-green-600 text-[10px] font-bold uppercase py-1 px-2 rounded mb-2">Enviada para</div>' : ''}
+                    ${isSharedWithMe ? `<div class="bg-blue-50 text-blue-600 text-[10px] font-bold uppercase py-1 px-2 rounded mb-2">De: ${creatorName}</div>` : ''}
                     <div class="flex justify-between items-start mb-2">
                         <div>
                             <h3 class="font-black text-slate-800 uppercase text-2xl leading-tight">${safeDebt.creditor}</h3>
