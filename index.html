@@ -3,6 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#4f46e5">
+    <meta name="description" content="Gerenciador de Dívidas">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="DebtFlow">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%234f46e5' width='100' height='100' rx='20'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='white' font-family='system-ui' font-weight='bold'>D</text></svg>">
     <title>DebtFlow PRO | v18</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -15,11 +22,11 @@
     <div id="loginScreen" class="fixed inset-0 z-[100] bg-slate-900 flex items-center justify-center p-6 text-white hidden">
         <div class="max-w-sm w-full space-y-6 text-center">
             <h1 class="text-5xl font-black italic mb-8 uppercase tracking-tighter">DebtFlow</h1>
-            <input type="email" id="email" placeholder="Email" class="w-full p-5 rounded-2xl text-slate-900 font-bold text-lg outline-none">
-            <input type="password" id="password" placeholder="Senha" class="w-full p-5 rounded-2xl text-slate-900 font-bold text-lg outline-none">
+            <input type="email" id="email" placeholder="Email" class="w-full p-5 rounded-lg text-slate-900 font-bold text-lg outline-none">
+            <input type="password" id="password" placeholder="Senha" class="w-full p-5 rounded-lg text-slate-900 font-bold text-lg outline-none">
             <div class="flex gap-3">
-                <button onclick="app.handleAuth('login')" class="flex-1 bg-indigo-600 py-5 rounded-2xl font-black text-lg uppercase">Entrar</button>
-                <button onclick="app.handleAuth('signup')" class="flex-1 bg-slate-800 py-5 rounded-2xl font-black text-sm uppercase">Criar</button>
+                <button onclick="app.handleAuth('login')" class="flex-1 bg-indigo-600 py-5 rounded-lg font-black text-lg uppercase">Entrar</button>
+                <button onclick="app.handleAuth('signup')" class="flex-1 bg-slate-800 py-5 rounded-lg font-black text-sm uppercase">Criar</button>
             </div>
             <p id="authError" class="text-red-400 text-sm font-bold hidden"></p>
         </div>
@@ -31,8 +38,8 @@
             <p id="userEmail" class="text-[10px] font-black text-slate-400 mt-1 uppercase tracking-widest"></p>
         </div>
         <div class="flex gap-2">
-            <button onclick="app.logout()" class="p-2 text-slate-400 font-bold text-[10px]">SAIR</button>
-            <button onclick="app.showModal('debtModal')" class="bg-indigo-600 text-white w-12 h-12 rounded-2xl shadow-lg flex items-center justify-center font-bold text-2xl">+</button>
+            <button onclick="app.logout()" class="p-2 text-slate-400 font-bold text-sm">SAIR</button>
+            <button onclick="app.showModal('debtModal')" class="bg-indigo-600 text-white w-12 h-12 rounded-lg shadow-lg flex items-center justify-center font-bold text-2xl">+</button>
         </div>
     </header>
 
@@ -46,7 +53,7 @@
     <main id="debtList" class="p-4 max-w-xl mx-auto space-y-6"></main>
 
     <div id="debtModal" class="hidden fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <form id="debtForm" class="bg-white w-full max-w-md rounded-[3rem] p-8 space-y-4 shadow-2xl overflow-y-auto max-h-[90vh]">
+        <form id="debtForm" class="bg-white w-full max-w-md rounded-xl p-8 space-y-4 shadow-2xl overflow-y-auto max-h-[90vh]">
             <h2 class="text-2xl font-black uppercase italic text-center">Novo Registro</h2>
             <div class="grid grid-cols-2 gap-2">
                 <input type="text" id="creditor" placeholder="Credor" class="p-4 bg-slate-100 rounded-xl font-bold text-lg" required>
@@ -56,15 +63,39 @@
             <input type="number" id="totalValue" placeholder="Valor Total" step="0.01" class="w-full p-4 bg-slate-100 rounded-xl font-bold text-lg" required>
             <div class="grid grid-cols-2 gap-2">
                 <input type="number" id="installmentsCount" placeholder="Nº Parc." class="p-4 bg-slate-100 rounded-xl font-bold text-lg" value="1">
-                <input type="date" id="firstDueDate" class="p-4 bg-slate-100 rounded-xl font-bold text-lg">
+                <input type="datetime-local" id="firstDueDate" class="p-4 bg-slate-100 rounded-xl font-bold text-lg">
             </div>
-            <button type="submit" class="w-full bg-indigo-600 text-white py-5 rounded-2xl font-black text-xl uppercase">Confirmar</button>
+            <button type="submit" class="w-full bg-indigo-600 text-white py-5 rounded-lg font-black text-xl uppercase">Confirmar</button>
             <button type="button" onclick="app.hideModal('debtModal')" class="w-full text-slate-400 font-bold text-sm uppercase">Cancelar</button>
         </form>
     </div>
 
+    <div id="datePickerModal" class="hidden fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-sm rounded-lg p-6 shadow-2xl">
+            <h3 id="datePickerTitle" class="text-xl font-black uppercase text-center mb-4">Selecionar Data</h3>
+            <div class="flex flex-col gap-4">
+                <div>
+                    <label class="text-xs font-bold text-slate-500 uppercase mb-1 block">Data</label>
+                    <input type="date" id="datePickerDate" class="w-full p-4 bg-slate-100 rounded-xl font-bold text-lg">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-slate-500 uppercase mb-1 block">Hora</label>
+                    <input type="time" id="datePickerTime" class="w-full p-4 bg-slate-100 rounded-xl font-bold text-lg">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-slate-500 uppercase mb-1 block">Observação</label>
+                    <textarea id="datePickerNote" placeholder="Opcional" class="w-full p-3 bg-slate-100 rounded-xl font-bold text-sm h-16 outline-none"></textarea>
+                </div>
+            </div>
+            <div class="flex gap-3 mt-6">
+                <button onclick="app.cancelDatePicker()" class="flex-1 py-4 bg-slate-100 text-slate-600 rounded-xl font-black uppercase text-sm">Cancelar</button>
+                <button onclick="app.handleDatePickerConfirm()" class="flex-1 py-4 bg-indigo-600 text-white rounded-xl font-black uppercase text-sm">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
     <div id="promptModal" class="hidden fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl">
+        <div class="bg-white w-full max-w-sm rounded-lg p-6 shadow-2xl">
             <h3 id="promptTitle" class="text-xl font-black uppercase text-center mb-4">Entrada</h3>
             <p id="promptMessage" class="text-sm text-slate-500 font-bold mb-4 text-center"></p>
             <input type="text" id="promptInput" class="w-full p-4 bg-slate-100 rounded-xl font-bold text-lg mb-4 outline-none">
@@ -77,7 +108,7 @@
     </div>
 
     <div id="confirmModal" class="hidden fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl">
+        <div class="bg-white w-full max-w-sm rounded-lg p-6 shadow-2xl">
             <h3 class="text-xl font-black uppercase text-center mb-2">Confirmar</h3>
             <p id="confirmMessage" class="text-sm text-slate-500 font-bold mb-6 text-center"></p>
             <div class="flex gap-3">
@@ -90,5 +121,10 @@
     <div id="toastContainer" class="fixed top-20 right-4 z-[300] space-y-2"></div>
 
     <script src="app.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js');
+        }
+    </script>
 </body>
 </html>

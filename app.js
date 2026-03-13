@@ -6,9 +6,15 @@ const app = {
     currentUser: null,
     debtsLocal: [],
     expandedIds: new Set(),
+    selectedInstallments: new Set(),
+    selectionMode: false,
+    compactMode: new Set(),
+    lastSelectedId: null,
     
     promptCallback: null,
     confirmCallback: null,
+    datePickerCallback: null,
+    datePickerContext: null,
 
     init() {
         this.supabaseClient = supabase.createClient(SB_URL, SB_KEY);
@@ -135,6 +141,33 @@ const app = {
         }
     },
 
+    formatDateTimeForDisplay(dateTimeStr) {
+        if (!dateTimeStr) return '';
+        const [datePart, timePart] = dateTimeStr.split('T');
+        if (!datePart) return dateTimeStr;
+        
+        const [year, month, day] = datePart.split('-');
+        if (timePart) {
+            const [hour, minute] = timePart.split(':');
+            return `${day}/${month}/${year} ${hour}:${minute}`;
+        }
+        return `${day}/${month}/${year}`;
+    },
+
+    parseDateTime(value) {
+        if (!value) return null;
+        const dt = new Date(value);
+        if (isNaN(dt.getTime())) return null;
+        
+        const year = dt.getFullYear();
+        const month = String(dt.getMonth() + 1).padStart(2, '0');
+        const day = String(dt.getDate()).padStart(2, '0');
+        const hours = String(dt.getHours()).padStart(2, '0');
+        const minutes = String(dt.getMinutes()).padStart(2, '0');
+        
+        return `${year}-${month}-${day}T${hours}:${minutes}`;
+    },
+
     async handleDebtSubmit() {
         const creditor = document.getElementById('creditor').value.trim();
         const debtor = document.getElementById('debtor').value.trim();
@@ -157,16 +190,22 @@ const app = {
         const installments = [];
 
         for (let i = 0; i < installmentsCount; i++) {
-            const dueDate = firstDueDate 
-                ? new Date(firstDueDate)
-                : new Date();
-            dueDate.setMonth(dueDate.getMonth() + i);
+            let dueDate;
+            if (firstDueDate) {
+                const baseDate = new Date(firstDueDate);
+                baseDate.setMonth(baseDate.getMonth() + i);
+                dueDate = baseDate.toISOString().slice(0, 16);
+            } else {
+                const baseDate = new Date();
+                baseDate.setMonth(baseDate.getMonth() + i);
+                dueDate = baseDate.toISOString().slice(0, 16);
+            }
 
             installments.push({
                 id: i + 1,
                 value: installmentValue.toFixed(2),
                 status: 'Pendente',
-                dueDate: dueDate.toISOString().split('T')[0],
+                dueDate: dueDate,
                 paidAt: null
             });
         }
@@ -207,7 +246,7 @@ const app = {
                 return { 
                     ...i, 
                     status: status, 
-                    paidAt: status === 'Pago' ? new Date().toLocaleDateString('pt-BR') : null 
+                    paidAt: status === 'Pago' ? new Date().toISOString().slice(0, 16) : null 
                 };
             }
             return i;
@@ -239,15 +278,129 @@ const app = {
         const fieldLabel = type === 'dueDate' ? 'Vencimento' : 'Pagamento';
         const currentValue = type === 'dueDate' ? inst.dueDate : (inst.paidAt || '');
 
-        this.showPrompt(
-            `Nova data (${fieldLabel})`,
-            'Use o formato AAAA-MM-DD',
-            currentValue,
-            (value) => {
-                if (!value) return;
-                this.updateDateField(debtId, instId, type, value);
+        const titleEl = document.getElementById('datePickerTitle');
+        titleEl.textContent = `${fieldLabel}`;
+
+        const dateInput = document.getElementById('datePickerDate');
+        const timeInput = document.getElementById('datePickerTime');
+
+        if (currentValue && currentValue.includes('T')) {
+            const [datePart, timePart] = currentValue.split('T');
+            dateInput.value = datePart;
+            timeInput.value = timePart || '00:00';
+        } else if (currentValue) {
+            dateInput.value = currentValue;
+            timeInput.value = '00:00';
+        } else {
+            const now = new Date();
+            dateInput.value = now.toISOString().split('T')[0];
+            timeInput.value = '00:00';
+        }
+
+        this.datePickerContext = { debtId, instId, type };
+        this.showModal('datePickerModal');
+    },
+
+    handleDatePickerConfirm() {
+        const dateInput = document.getElementById('datePickerDate').value;
+        const timeInput = document.getElementById('datePickerTime').value;
+
+        if (!dateInput) {
+            this.showToast('Selecione uma data', 'error');
+            return;
+        }
+
+        const dateTime = `${dateInput}T${timeInput || '00:00'}`;
+        this.hideModal('datePickerModal');
+
+        if (this.datePickerContext?.mode === 'addInstallment') {
+            const { debtId, lastId, value } = this.datePickerContext;
+            const debt = this.debtsLocal.find(d => d.id === debtId);
+
+            const newInsts = [...debt.installments, {
+                id: lastId + 1,
+                value: parseFloat(value).toFixed(2),
+                status: 'Pendente',
+                dueDate: dateTime,
+                paidAt: null
+            }];
+
+            this.showLoading();
+
+            (async () => {
+                try {
+                    const { error } = await this.supabaseClient
+                        .from('debts')
+                        .update({
+                            installments: newInsts,
+                            total_value: parseFloat(debt.total_value) + parseFloat(value)
+                        })
+                        .eq('id', debtId);
+
+                    if (error) throw error;
+                    this.showToast('Parcela adicionada!', 'success');
+                    await this.loadDebts();
+                } catch (err) {
+                    this.showToast('Erro ao adicionar parcela', 'error');
+                } finally {
+                    this.hideLoading();
+                }
+            })();
+        } else if (this.datePickerContext?.mode === 'addMultipleInstallments') {
+            const { debtId, lastId, value, count } = this.datePickerContext;
+            const debt = this.debtsLocal.find(d => d.id === debtId);
+            
+            const newInsts = [...debt.installments];
+            const baseDate = new Date(dateTime);
+
+            for (let i = 0; i < count; i++) {
+                const instDate = new Date(baseDate);
+                instDate.setMonth(instDate.getMonth() + i);
+                newInsts.push({
+                    id: lastId + 1 + i,
+                    value: parseFloat(value).toFixed(2),
+                    status: 'Pendente',
+                    dueDate: instDate.toISOString().slice(0, 16),
+                    paidAt: null
+                });
             }
-        );
+
+            this.showLoading();
+
+            (async () => {
+                try {
+                    const { error } = await this.supabaseClient
+                        .from('debts')
+                        .update({
+                            installments: newInsts,
+                            total_value: parseFloat(debt.total_value) + (parseFloat(value) * count)
+                        })
+                        .eq('id', debtId);
+
+                    if (error) throw error;
+                    this.showToast(`${count} parcelas adicionadas!`, 'success');
+                    await this.loadDebts();
+                } catch (err) {
+                    this.showToast('Erro ao adicionar parcelas', 'error');
+                } finally {
+                    this.hideLoading();
+                }
+            })();
+        } else if (this.datePickerContext) {
+            const { debtId, instId, type } = this.datePickerContext;
+            this.updateDateField(debtId, instId, type, dateTime);
+        }
+        
+        this.datePickerContext = null;
+    },
+
+    confirmDatePicker() {
+        this.handleDatePickerConfirm();
+    },
+
+    cancelDatePicker() {
+        this.hideModal('datePickerModal');
+        this.datePickerContext = null;
     },
 
     async updateDateField(debtId, instId, type, value) {
@@ -307,77 +460,137 @@ const app = {
     },
 
     shareDebt(debtId) {
-        this.showPrompt(
-            'ID do usuário destino',
-            'Cole o ID (UUID) do usuário',
-            '',
-            async (friendId) => {
-                if (!friendId) return;
-                
-                const debt = this.debtsLocal.find(d => d.id === debtId);
-                const updatedShared = Array.from(new Set([...(debt.shared_with || []), friendId]));
-
-                try {
-                    const { error } = await this.supabaseClient
-                        .from('debts')
-                        .update({ shared_with: updatedShared })
-                        .eq('id', debtId);
-
-                    if (error) throw error;
-                    this.showToast('Dívida compartilhada!', 'success');
-                } catch (err) {
-                    this.showToast('Erro ao compartilhar', 'error');
+        const debt = this.debtsLocal.find(d => d.id === debtId);
+        const sharedWith = debt.shared_with || [];
+        
+        if (sharedWith.length > 0) {
+            const options = sharedWith.map(id => ({ label: id, value: id }));
+            options.push({ label: '+ Adicionar novo', value: 'new' });
+            
+            let message = 'Usuários com acesso:\n';
+            sharedWith.forEach((id, idx) => {
+                message += `${idx + 1}. ${id}\n`;
+            });
+            message += '\nClique em um para remover o acesso.';
+            
+            this.showToast(message, 'info');
+            
+            setTimeout(() => {
+                const removeId = prompt('Cole o ID do usuário para REMOVER o compartilhamento (ou cancele para manter):');
+                if (removeId && sharedWith.includes(removeId)) {
+                    const updatedShared = sharedWith.filter(id => id !== removeId);
+                    this.updateSharedWith(debtId, updatedShared);
                 }
-            }
-        );
+            }, 500);
+        } else {
+            this.showPrompt(
+                'ID do usuário destino',
+                'Cole o ID (UUID) do usuário',
+                '',
+                (friendId) => {
+                    if (!friendId) return;
+                    const updatedShared = [friendId];
+                    this.updateSharedWith(debtId, updatedShared);
+                }
+            );
+        }
+    },
+
+    async updateSharedWith(debtId, updatedShared) {
+        try {
+            const { error } = await this.supabaseClient
+                .from('debts')
+                .update({ shared_with: updatedShared })
+                .eq('id', debtId);
+
+            if (error) throw error;
+            this.showToast(updatedShared.length > 0 ? 'Dívida compartilhada!' : 'Compartilhamento removido!', 'success');
+            await this.loadDebts();
+        } catch (err) {
+            this.showToast('Erro ao atualizar compartilhamento', 'error');
+        }
     },
 
     addInstallment(debtId) {
         const debt = this.debtsLocal.find(d => d.id === debtId);
         const lastId = Math.max(...debt.installments.map(i => i.id)) || 0;
+        const lastInst = debt.installments.length > 0 ? debt.installments[debt.installments.length - 1] : null;
+        const defaultValue = lastInst ? lastInst.value : '';
 
         this.showPrompt(
             'Valor da nova parcela',
-            'Exemplo: 150.00',
-            '',
+            'Valor de cada parcela',
+            defaultValue,
             (val) => {
                 if (!val || isNaN(parseFloat(val))) {
                     this.showToast('Valor inválido', 'error');
                     return;
                 }
+
+                const dateInput = document.getElementById('datePickerDate');
+                const timeInput = document.getElementById('datePickerTime');
+                
+                dateInput.value = new Date().toISOString().split('T')[0];
+                timeInput.value = '00:00';
+
+                const titleEl = document.getElementById('datePickerTitle');
+                titleEl.textContent = 'Vencimento';
+
+                this.datePickerContext = { 
+                    debtId, 
+                    lastId, 
+                    value: val,
+                    mode: 'addInstallment'
+                };
+                this.showModal('datePickerModal');
+            }
+        );
+    },
+
+    addMultipleInstallments(debtId) {
+        const debt = this.debtsLocal.find(d => d.id === debtId);
+        const lastId = Math.max(...debt.installments.map(i => i.id)) || 0;
+        const lastInst = debt.installments.length > 0 ? debt.installments[debt.installments.length - 1] : null;
+        const defaultValue = lastInst ? lastInst.value : '';
+
+        this.showPrompt(
+            'Adicionar Múltiplas Parcelas',
+            'Quantas parcelas deseja adicionar?',
+            '1',
+            (countStr) => {
+                const count = parseInt(countStr);
+                if (!count || count < 1 || count > 60) {
+                    this.showToast('Quantidade inválida (1-60)', 'error');
+                    return;
+                }
+
                 this.showPrompt(
-                    'Vencimento (AAAA-MM-DD)',
-                    'Data no formato ISO',
-                    new Date().toISOString().split('T')[0],
-                    async (date) => {
-                        if (!date) return;
-                        
-                        const newInsts = [...debt.installments, {
-                            id: lastId + 1,
-                            value: parseFloat(val).toFixed(2),
-                            status: 'Pendente',
-                            dueDate: date,
-                            paidAt: null
-                        }];
-
-                        this.showLoading();
-                        try {
-                            const { error } = await this.supabaseClient
-                                .from('debts')
-                                .update({
-                                    installments: newInsts,
-                                    total_value: parseFloat(debt.total_value) + parseFloat(val)
-                                })
-                                .eq('id', debtId);
-
-                            if (error) throw error;
-                            this.showToast('Parcela adicionada!', 'success');
-                            await this.loadDebts();
-                        } catch (err) {
-                            this.showToast('Erro ao adicionar parcela', 'error');
-                        } finally {
-                            this.hideLoading();
+                    'Valor de cada parcela',
+                    'Valor de cada nova parcela',
+                    defaultValue,
+                    (val) => {
+                        if (!val || isNaN(parseFloat(val))) {
+                            this.showToast('Valor inválido', 'error');
+                            return;
                         }
+
+                        const dateInput = document.getElementById('datePickerDate');
+                        const timeInput = document.getElementById('datePickerTime');
+                        
+                        dateInput.value = new Date().toISOString().split('T')[0];
+                        timeInput.value = '00:00';
+
+                        const titleEl = document.getElementById('datePickerTitle');
+                        titleEl.textContent = 'Primeiro Vencimento';
+
+                        this.datePickerContext = { 
+                            debtId, 
+                            lastId, 
+                            value: val,
+                            count: count,
+                            mode: 'addMultipleInstallments'
+                        };
+                        this.showModal('datePickerModal');
                     }
                 );
             }
@@ -385,12 +598,54 @@ const app = {
     },
 
     removeInstallment(debtId, instId) {
-        this.showConfirm(
-            'Remover esta parcela?',
-            async () => {
-                const debt = this.debtsLocal.find(d => d.id === debtId);
-                const removed = debt.installments.find(i => i.id === parseInt(instId));
-                const newInsts = debt.installments.filter(i => i.id !== parseInt(instId));
+        const debt = this.debtsLocal.find(d => d.id === debtId);
+        const removed = debt.installments.find(i => i.id === parseInt(instId));
+        const newInsts = debt.installments.filter(i => i.id !== parseInt(instId));
+
+        this.showLoading();
+        (async () => {
+            try {
+                const { error } = await this.supabaseClient
+                    .from('debts')
+                    .update({
+                        installments: newInsts,
+                        total_value: parseFloat(debt.total_value) - parseFloat(removed.value)
+                    })
+                    .eq('id', debtId);
+
+                if (error) throw error;
+                this.showToast('Parcela removida', 'success');
+                await this.loadDebts();
+            } catch (err) {
+                this.showToast('Erro ao remover parcela', 'error');
+            } finally {
+                this.hideLoading();
+            }
+        })();
+    },
+
+    editInstallmentValue(debtId, instId) {
+        const debt = this.debtsLocal.find(d => d.id === debtId);
+        const inst = debt?.installments.find(i => i.id === parseInt(instId));
+        if (!inst) return;
+
+        this.showPrompt(
+            'Editar Valor',
+            'Novo valor da parcela',
+            inst.value,
+            async (newValue) => {
+                if (!newValue || isNaN(parseFloat(newValue))) {
+                    this.showToast('Valor inválido', 'error');
+                    return;
+                }
+
+                const diff = parseFloat(newValue) - parseFloat(inst.value);
+                const newInsts = debt.installments.map(i => {
+                    if (i.id === parseInt(instId)) {
+                        return { ...i, value: parseFloat(newValue).toFixed(2) };
+                    }
+                    return i;
+                });
 
                 this.showLoading();
                 try {
@@ -398,15 +653,51 @@ const app = {
                         .from('debts')
                         .update({
                             installments: newInsts,
-                            total_value: parseFloat(debt.total_value) - parseFloat(removed.value)
+                            total_value: parseFloat(debt.total_value) + diff
                         })
                         .eq('id', debtId);
 
                     if (error) throw error;
-                    this.showToast('Parcela removida', 'success');
+                    this.showToast('Valor atualizado!', 'success');
                     await this.loadDebts();
                 } catch (err) {
-                    this.showToast('Erro ao remover parcela', 'error');
+                    this.showToast('Erro ao atualizar valor', 'error');
+                } finally {
+                    this.hideLoading();
+                }
+            }
+        );
+    },
+
+    editInstallmentNote(debtId, instId) {
+        const debt = this.debtsLocal.find(d => d.id === debtId);
+        const inst = debt?.installments.find(i => i.id === parseInt(instId));
+        if (!inst) return;
+
+        this.showPrompt(
+            'Observação',
+            'Adicione uma observação para esta parcela',
+            inst.note || '',
+            async (note) => {
+                const newInsts = debt.installments.map(i => {
+                    if (i.id === parseInt(instId)) {
+                        return { ...i, note: note || null };
+                    }
+                    return i;
+                });
+
+                this.showLoading();
+                try {
+                    const { error } = await this.supabaseClient
+                        .from('debts')
+                        .update({ installments: newInsts })
+                        .eq('id', debtId);
+
+                    if (error) throw error;
+                    this.showToast('Observação salva!', 'success');
+                    await this.loadDebts();
+                } catch (err) {
+                    this.showToast('Erro ao salvar observação', 'error');
                 } finally {
                     this.hideLoading();
                 }
@@ -477,28 +768,58 @@ const app = {
         const d = this.debtsLocal.find(x => x.id === debtId);
         if (!d) return;
 
-        const doc = new jsPDF({ unit: 'mm', format: [100, 250] });
-        doc.setFillColor(30, 41, 59);
-        doc.rect(0, 0, 100, 35, 'F');
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(16);
-        doc.text('EXTRATO DE FLUXO', 10, 15);
-        doc.setFontSize(10);
-        doc.text(`Credor: ${d.creditor.toUpperCase()}`, 10, 25);
-        doc.setTextColor(40);
-        doc.setFontSize(12);
-        doc.text(`Devedor: ${d.debtor}`, 10, 45);
+        const lineHeight = 7;
+        const headerHeight = 30;
+        const footerHeight = 10;
+        const contentHeight = d.installments.length * lineHeight + footerHeight;
+        const pageHeight = Math.max(100, headerHeight + contentHeight + 30);
         
-        let y = 60;
+        const doc = new jsPDF({ unit: 'mm', format: [80, pageHeight] });
+        doc.setFillColor(30, 41, 59);
+        doc.rect(0, 0, 80, 22, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(14);
+        doc.text('DEBTFLOW', 5, 9);
+        doc.setFontSize(9);
+        doc.text(`${d.creditor.toUpperCase()}`, 5, 15);
+        doc.text(`${d.debtor}`, 5, 19);
+        
+        let y = 26;
+        const paidVal = d.installments.filter(i => i.status === 'Pago').reduce((acc, i) => acc + parseFloat(i.value), 0);
+        const totalVal = parseFloat(d.total_value);
+        
+        doc.setTextColor(0);
+        doc.setFontSize(8);
+        doc.text(`Total: R$ ${totalVal.toFixed(2)} | Pago: R$ ${paidVal.toFixed(2)}`, 5, y);
+        y += 4;
+        
+        doc.setDrawColor(200);
+        doc.line(5, y, 75, y);
+        y += 3;
+        
         d.installments.forEach(i => {
-            doc.setFillColor(245);
-            doc.rect(5, y - 5, 90, 25, 'F');
-            doc.setFontSize(11);
-            doc.text(`R$ ${i.value} (${i.status})`, 10, y + 2);
             doc.setFontSize(9);
-            doc.text(`Venc: ${i.dueDate}`, 10, y + 8);
-            if (i.paidAt) doc.text(`Pago: ${i.paidAt}`, 10, y + 14);
-            y += 30;
+            doc.setTextColor(i.status === 'Pago' ? 16 : 220, i.status === 'Pago' ? 185 : 0, i.status === 'Pago' ? 80 : 0);
+            doc.text(`R$ ${i.value}`, 5, y);
+            doc.setFontSize(7);
+            doc.setTextColor(100);
+            const displayDate = this.formatDateTimeForDisplay(i.dueDate);
+            doc.text(`${displayDate}`, 28, y);
+            if (i.status === 'Pago') {
+                doc.setTextColor(16, 185, 129);
+                doc.text('PAGO', 55, y);
+            } else {
+                doc.setTextColor(239, 68, 68);
+                doc.text('PENDENTE', 50, y);
+            }
+            if (i.note) {
+                doc.setTextColor(100);
+                doc.setFontSize(6);
+                doc.text(`Obs: ${i.note.substring(0, 25)}${i.note.length > 25 ? '...' : ''}`, 5, y + 3);
+                y += lineHeight + 3;
+            } else {
+                y += lineHeight;
+            }
         });
         
         doc.save(`Extrato_${d.creditor}.pdf`);
@@ -511,72 +832,124 @@ const app = {
         this.debtsLocal.forEach(d => {
             const safeDebt = this.sanitizeDebt(d);
             const isExp = this.expandedIds.has(d.id);
-            const isOwner = d.creator_id === this.currentUser.id;
+            const canEdit = d.creator_id && d.creator_id === this.currentUser.id;
             const paidVal = d.installments
                 .filter(i => i.status === 'Pago')
                 .reduce((acc, i) => acc + parseFloat(i.value), 0);
             const totalVal = parseFloat(d.total_value);
 
             const card = document.createElement('div');
-            card.className = "bg-white rounded-[2.5rem] shadow-xl border border-slate-200 overflow-hidden";
+            card.className = "bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden";
             card.innerHTML = `
                 <div class="p-6 cursor-pointer" onclick="app.toggleExpand('${d.id}')">
                     <div class="flex justify-between items-start mb-2">
                         <div>
                             <h3 class="font-black text-slate-800 uppercase text-2xl leading-tight">${safeDebt.creditor}</h3>
-                            <p class="text-xs font-black text-slate-400 uppercase tracking-widest">${safeDebt.debtor}</p>
+                            <p class="text-base font-black text-slate-400 uppercase tracking-widest">${safeDebt.debtor}</p>
                         </div>
                         <p class="text-lg font-black text-indigo-600 italic">R$ ${totalVal.toFixed(2)}</p>
                     </div>
                     ${safeDebt.description ? `<p class="text-sm font-bold text-slate-500 mb-4 bg-slate-50 p-3 rounded-xl">${safeDebt.description}</p>` : ''}
                     <div class="grid grid-cols-2 gap-3">
-                        <div class="bg-emerald-50 p-4 rounded-2xl border border-emerald-100">
-                            <p class="text-[10px] font-black text-emerald-600 uppercase">Pago</p>
-                            <p class="text-lg font-black text-emerald-700 leading-none">R$ ${paidVal.toFixed(2)}</p>
+                        <div class="bg-emerald-50 p-4 rounded-lg border border-emerald-100">
+                            <p class="text-xs font-black text-emerald-600 uppercase">Pago</p>
+                            <p class="text-xl font-black text-emerald-700 leading-none">R$ ${paidVal.toFixed(2)}</p>
                         </div>
-                        <div class="bg-rose-50 p-4 rounded-2xl border border-rose-100">
-                            <p class="text-[10px] font-black text-rose-600 uppercase">Restante</p>
-                            <p class="text-lg font-black text-rose-700 leading-none">R$ ${(totalVal - paidVal).toFixed(2)}</p>
+                        <div class="bg-rose-50 p-4 rounded-lg border border-rose-100">
+                            <p class="text-xs font-black text-rose-600 uppercase">Restante</p>
+                            <p class="text-xl font-black text-rose-700 leading-none">R$ ${(totalVal - paidVal).toFixed(2)}</p>
                         </div>
                     </div>
                 </div>
 
                 <div class="${isExp ? 'block' : 'hidden'} bg-slate-50 border-t border-slate-200 p-5 space-y-4">
-                    <div class="grid grid-cols-2 gap-2">
-                        <button onclick="app.exportMobilePDF('${d.id}')" class="py-4 bg-slate-800 text-white rounded-2xl font-black text-xs uppercase tracking-widest">PDF Celular</button>
-                        <button onclick="app.addInstallment('${d.id}')" class="py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase">+ Parcela</button>
+                    ${canEdit ? `
+                    <div class="grid grid-cols-3 gap-2">
+                        <button onclick="app.exportMobilePDF('${d.id}')" class="py-3 text-black rounded-lg font-black text-xs uppercase tracking-wider" style="background-color: #ffca28;">PDF</button>
+                        <button onclick="app.addInstallment('${d.id}')" class="py-3 bg-indigo-600 text-white rounded-lg font-black text-xs uppercase">+ 1 Parc</button>
+                        <button onclick="app.addMultipleInstallments('${d.id}')" class="py-3 bg-indigo-600 text-white rounded-lg font-black text-xs uppercase">+ Multi</button>
                     </div>
                     <div class="grid grid-cols-2 gap-2">
-                        ${isOwner ? `<button onclick="app.shareDebt('${d.id}')" class="py-3 bg-white border border-slate-300 text-slate-600 rounded-xl font-black text-[10px] uppercase">Compartilhar</button>` : ''}
+                        <button onclick="app.shareDebt('${d.id}')" class="py-3 bg-white border border-slate-300 text-slate-600 rounded-xl font-black text-[10px] uppercase">${(d.shared_with || []).length > 0 ? `Compartilhado (${d.shared_with.length})` : 'Compartilhar'}</button>
                         <button onclick="app.showMyId()" class="py-3 bg-white border border-slate-300 text-slate-600 rounded-xl font-black text-[10px] uppercase">Meu ID</button>
                     </div>
 
-                    <div class="space-y-2">
+                    <div class="flex gap-2 flex-wrap">
+                        <button onclick="app.toggleSelectionMode('${d.id}')" class="py-2 px-3 bg-slate-200 text-slate-700 rounded-lg font-black text-xs uppercase">Selecionar</button>
+                        <button onclick="app.selectPendingInDebt('${d.id}')" class="py-2 px-3 bg-amber-100 text-amber-700 rounded-lg font-black text-xs uppercase">Pendentes</button>
+                        <button onclick="app.selectAllInDebt('${d.id}')" class="py-2 px-3 bg-blue-100 text-blue-700 rounded-lg font-black text-xs uppercase">Todas</button>
+                        <button onclick="app.clearSelectionInDebt('${d.id}')" class="py-2 px-3 bg-slate-100 text-slate-500 rounded-lg font-black text-xs uppercase">Limpar</button>
+                        ${this.selectedInstallments.size > 0 ? `<button onclick="app.markSelectedAsPaid('${d.id}')" class="py-2 px-3 bg-emerald-500 text-white rounded-lg font-black text-xs uppercase">Pagar (${this.selectedInstallments.size})</button>` : ''}
+                    </div>
+
+                    <button onclick="app.toggleCompactMode('${d.id}')" class="w-full py-2 bg-slate-200 text-slate-600 rounded-lg font-bold text-xs uppercase">
+                        ${this.compactMode.has(d.id) ? 'Modo Normal' : 'Modo Compacto'}
+                    </button>
+
+                    ${(() => {
+                        const isCompact = this.compactMode.has(d.id);
+                        if (isCompact) {
+                            return `<div class="grid grid-cols-5 gap-1 text-xs">` + 
+                                d.installments.map(i => `
+                                    <div onclick="app.toggleCompactInstallment('${d.id}', ${i.id})" class="p-2 rounded cursor-pointer ${i.status === 'Pago' ? 'bg-emerald-100 text-emerald-700 border-2 border-emerald-500' : 'bg-slate-100 text-slate-600 border-2 border-transparent hover:border-indigo-300'}">
+                                        <div class="font-bold text-xs">R$ ${parseFloat(i.value).toFixed(0)}</div>
+                                        <div class="text-[9px]">${i.dueDate ? i.dueDate.split('T')[0].slice(5) : ''}</div>
+                                        <div class="text-[8px] mt-1">${i.status === 'Pago' ? '✅' : '⏳'}</div>
+                                    </div>
+                                `).join('') + 
+                                `</div>`;
+                        }
+                        return `<div class="space-y-1">
                         ${d.installments.map(i => `
-                            <div class="relative rounded-[1.5rem] overflow-hidden">
+                            <div class="relative rounded-lg overflow-hidden">
                                 <div class="swipe-bg-right uppercase">Pago</div>
                                 <div class="swipe-bg-left uppercase">Pendente</div>
-                                <div class="inst-card p-5 flex items-center justify-between border border-slate-200" 
+                                <div class="inst-card p-3 flex items-center justify-between border border-slate-200" 
                                      ontouchstart="app.tS(event)" 
                                      ontouchmove="app.tM(event)" 
                                      ontouchend="app.tE(event, '${d.id}', ${i.id})"
                                      onmousedown="app.tS(event)"
                                      onmousemove="app.tM(event)"
                                      onmouseup="app.tE(event, '${d.id}', ${i.id})">
-                                    <div>
-                                        <p class="text-xl font-black ${i.status === 'Pago' ? 'text-emerald-500' : 'text-slate-800'}">R$ ${i.value}</p>
-                                        <div class="flex gap-4 mt-1">
-                                            <p class="text-xs font-bold text-slate-400 cursor-pointer hover:text-indigo-500" onclick="app.editDate('${d.id}', ${i.id}, 'dueDate')">Venc: <span class="underline">${i.dueDate}</span></p>
-                                            ${i.paidAt ? `<p class="text-xs font-bold text-emerald-400 cursor-pointer hover:text-indigo-500" onclick="app.editDate('${d.id}', ${i.id}, 'paidAt')">Pago: <span class="underline">${i.paidAt}</span></p>` : ''}
+                                    <div class="flex items-center gap-3">
+                                        <input type="checkbox" 
+                                            onclick="event.stopPropagation(); app.toggleInstallmentSelection('${d.id}', ${i.id}, event)" 
+                                            ${this.selectedInstallments.has('${d.id}_${i.id}') ? 'checked' : ''}
+                                            class="w-5 h-5 accent-indigo-600">
+                                        <div>
+                                            <p class="text-lg font-black ${i.status === 'Pago' ? 'text-emerald-500' : 'text-slate-800'} cursor-pointer hover:text-indigo-500" onclick="event.stopPropagation(); app.editInstallmentValue('${d.id}', ${i.id})">R$ ${i.value}</p>
+                                            <div class="flex gap-4 mt-1">
+                                                <p class="text-xs font-bold text-slate-400 cursor-pointer hover:text-indigo-500" onclick="app.editDate('${d.id}', ${i.id}, 'dueDate')">Venc: <span class="underline">${app.formatDateTimeForDisplay(i.dueDate)}</span></p>
+                                                ${i.paidAt ? `<p class="text-xs font-bold text-emerald-400 cursor-pointer hover:text-indigo-500" onclick="app.editDate('${d.id}', ${i.id}, 'paidAt')">Pago: <span class="underline">${app.formatDateTimeForDisplay(i.paidAt)}</span></p>` : ''}
+                                            </div>
+                                            ${i.note ? `<div class="text-xs font-bold text-slate-500 mt-1 cursor-pointer hover:text-indigo-500" onclick="app.editInstallmentNote('${d.id}', ${i.id})">📝 ${i.note}</div>` : `<div class="text-xs text-slate-300 mt-1 cursor-pointer hover:text-indigo-500" onclick="app.editInstallmentNote('${d.id}', ${i.id})">+ obs</div>`}
                                         </div>
                                     </div>
                                     <button onclick="app.removeInstallment('${d.id}', ${i.id})" class="text-rose-300 p-2 font-black text-xl hover:text-rose-500">✕</button>
                                 </div>
                             </div>
                         `).join('')}
-                    </div>
+                    </div>`;
+                    })()}
                     
-                    ${isOwner ? `<button onclick="app.deleteDebt('${d.id}')" class="w-full py-4 text-rose-500 font-black text-xs uppercase tracking-[0.3em] bg-rose-50 rounded-2xl mt-4">Apagar Fluxo Completo</button>` : ''}
+                    <button onclick="app.deleteDebt('${d.id}')" class="w-full py-3 text-rose-500 font-black text-xs uppercase tracking-[0.3em] bg-rose-50 rounded-lg mt-3">Excluir dívida</button>
+                    ` : `
+                    <div class="space-y-2">
+                        ${d.installments.map(i => `
+                            <div class="p-3 flex items-center justify-between border border-slate-200 bg-white rounded-lg">
+                                <div>
+                                    <p class="text-lg font-black ${i.status === 'Pago' ? 'text-emerald-500' : 'text-slate-800'}">R$ ${i.value}</p>
+                                    <div class="flex gap-4 mt-1">
+                                        <p class="text-xs font-bold text-slate-400">Venc: ${app.formatDateTimeForDisplay(i.dueDate)}</p>
+                                        ${i.paidAt ? `<p class="text-xs font-bold text-emerald-400">Pago: ${app.formatDateTimeForDisplay(i.paidAt)}</p>` : ''}
+                                    </div>
+                                    ${i.note ? `<div class="text-xs font-bold text-slate-500 mt-1">📝 ${i.note}</div>` : ''}
+                                </div>
+                                <div class="text-2xl">${i.status === 'Pago' ? '✅' : '⏳'}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                    `}
                 </div>
             `;
             main.appendChild(card);
@@ -614,6 +987,126 @@ const app = {
         else if (finalX < -70) this.updateStatus(debtId, instId, 'Pendente');
         
         this.currentTarget = null;
+    },
+
+    toggleSelectionMode(debtId) {
+        this.selectionMode = !this.selectionMode;
+        if (!this.selectionMode) {
+            this.selectedInstallments.clear();
+        }
+        this.render();
+    },
+
+    toggleCompactMode(debtId) {
+        if (this.compactMode.has(debtId)) {
+            this.compactMode.delete(debtId);
+        } else {
+            this.compactMode.add(debtId);
+        }
+        this.render();
+    },
+
+    toggleCompactInstallment(debtId, instId) {
+        const debt = this.debtsLocal.find(d => d.id === debtId);
+        if (!debt) return;
+        
+        const inst = debt.installments.find(i => i.id === parseInt(instId));
+        if (!inst) return;
+        
+        const newStatus = inst.status === 'Pago' ? 'Pendente' : 'Pago';
+        this.updateStatus(debtId, instId, newStatus);
+    },
+
+    toggleInstallmentSelection(debtId, instId, event) {
+        const debt = this.debtsLocal.find(d => d.id === debtId);
+        const instIndex = debt.installments.findIndex(i => i.id === parseInt(instId));
+        
+        if (event && event.shiftKey && this.lastSelectedId !== null) {
+            const lastIndex = debt.installments.findIndex(i => i.id === this.lastSelectedId);
+            const start = Math.min(instIndex, lastIndex);
+            const end = Math.max(instIndex, lastIndex);
+            
+            for (let i = start; i <= end; i++) {
+                const key = `${debtId}_${debt.installments[i].id}`;
+                this.selectedInstallments.add(key);
+            }
+        } else {
+            const key = `${debtId}_${instId}`;
+            if (this.selectedInstallments.has(key)) {
+                this.selectedInstallments.delete(key);
+            } else {
+                this.selectedInstallments.add(key);
+            }
+        }
+        
+        this.lastSelectedId = parseInt(instId);
+        this.render();
+    },
+
+    selectAllInDebt(debtId) {
+        const debt = this.debtsLocal.find(d => d.id === debtId);
+        debt.installments.forEach(i => {
+            this.selectedInstallments.add(`${debtId}_${i.id}`);
+        });
+        this.render();
+    },
+
+    selectPendingInDebt(debtId) {
+        const debt = this.debtsLocal.find(d => d.id === debtId);
+        debt.installments.forEach(i => {
+            if (i.status !== 'Pago') {
+                this.selectedInstallments.add(`${debtId}_${i.id}`);
+            }
+        });
+        this.render();
+    },
+
+    clearSelectionInDebt(debtId) {
+        const debt = this.debtsLocal.find(d => d.id === debtId);
+        debt.installments.forEach(i => {
+            this.selectedInstallments.delete(`${debtId}_${i.id}`);
+        });
+        this.render();
+    },
+
+    markSelectedAsPaid(debtId) {
+        if (this.selectedInstallments.size === 0) return;
+
+        const debt = this.debtsLocal.find(d => d.id === debtId);
+        if (!debt) return;
+
+        const newInsts = debt.installments.map(i => {
+            const key = `${debtId}_${i.id}`;
+            if (this.selectedInstallments.has(key) && i.status !== 'Pago') {
+                return { 
+                    ...i, 
+                    status: 'Pago', 
+                    paidAt: new Date().toISOString().slice(0, 16)
+                };
+            }
+            return i;
+        });
+
+        this.showLoading();
+
+        (async () => {
+            try {
+                const { error } = await this.supabaseClient
+                    .from('debts')
+                    .update({ installments: newInsts })
+                    .eq('id', debtId);
+
+                if (error) throw error;
+                
+                this.selectedInstallments.clear();
+                this.showToast('Parcelas marcadas como pago!', 'success');
+                await this.loadDebts();
+            } catch (err) {
+                this.showToast('Erro ao atualizar parcelas', 'error');
+            } finally {
+                this.hideLoading();
+            }
+        })();
     }
 };
 
