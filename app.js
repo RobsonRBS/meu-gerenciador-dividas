@@ -73,6 +73,7 @@ const app = {
     },
 
     showResetPasswordModal() {
+        console.log('Opening reset password modal');
         document.getElementById('resetEmail').value = document.getElementById('email').value;
         document.getElementById('resetError').classList.add('hidden');
         this.showModal('resetPasswordModal');
