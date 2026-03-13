@@ -15,6 +15,8 @@ const app = {
     confirmCallback: null,
     datePickerCallback: null,
     datePickerContext: null,
+    usersList: [],
+    shareContext: null,
 
     init() {
         this.supabaseClient = supabase.createClient(SB_URL, SB_KEY);
@@ -23,6 +25,7 @@ const app = {
                 this.currentUser = session.user;
                 document.getElementById('userEmail').innerText = this.escapeHtml(this.currentUser.email);
                 this.loadDebts();
+                this.loadUsers();
                 document.getElementById('loginScreen').classList.add('hidden');
             } else {
                 document.getElementById('loginScreen').classList.remove('hidden');
@@ -138,6 +141,21 @@ const app = {
             this.showToast('Erro ao carregar dívidas', 'error');
         } finally {
             this.hideLoading();
+        }
+    },
+
+    async loadUsers() {
+        try {
+            const { data, error } = await this.supabaseClient
+                .from('profiles')
+                .select('id, email')
+                .neq('id', this.currentUser.id);
+            
+            if (!error) {
+                this.usersList = data || [];
+            }
+        } catch (err) {
+            console.log('Erro ao carregar usuários:', err);
         }
     },
 
@@ -463,37 +481,56 @@ const app = {
         const debt = this.debtsLocal.find(d => d.id === debtId);
         const sharedWith = debt.shared_with || [];
         
-        if (sharedWith.length > 0) {
-            const options = sharedWith.map(id => ({ label: id, value: id }));
-            options.push({ label: '+ Adicionar novo', value: 'new' });
-            
-            let message = 'Usuários com acesso:\n';
-            sharedWith.forEach((id, idx) => {
-                message += `${idx + 1}. ${id}\n`;
-            });
-            message += '\nClique em um para remover o acesso.';
-            
-            this.showToast(message, 'info');
-            
-            setTimeout(() => {
-                const removeId = prompt('Cole o ID do usuário para REMOVER o compartilhamento (ou cancele para manter):');
-                if (removeId && sharedWith.includes(removeId)) {
-                    const updatedShared = sharedWith.filter(id => id !== removeId);
-                    this.updateSharedWith(debtId, updatedShared);
-                }
-            }, 500);
+        this.shareContext = { debtId, sharedWith };
+        
+        const userListEl = document.getElementById('userList');
+        userListEl.innerHTML = '';
+        
+        const availableUsers = this.usersList.filter(u => !sharedWith.includes(u.id));
+        
+        if (availableUsers.length === 0) {
+            userListEl.innerHTML = '<p class="text-center text-slate-400 py-4">Nenhum usuário disponível para compartilhar</p>';
         } else {
-            this.showPrompt(
-                'ID do usuário destino',
-                'Cole o ID (UUID) do usuário',
-                '',
-                (friendId) => {
-                    if (!friendId) return;
-                    const updatedShared = [friendId];
-                    this.updateSharedWith(debtId, updatedShared);
-                }
-            );
+            availableUsers.forEach(user => {
+                const btn = document.createElement('button');
+                btn.className = 'w-full p-3 bg-slate-100 rounded-lg text-left hover:bg-indigo-50 transition';
+                btn.innerHTML = `
+                    <div class="font-bold text-slate-700">${this.escapeHtml(user.email || 'Usuário')}</div>
+                    <div class="text-xs text-slate-400">${user.id}</div>
+                `;
+                btn.onclick = () => {
+                    this.hideModal('userSelectModal');
+                    const newShared = [...sharedWith, user.id];
+                    this.updateSharedWith(debtId, newShared);
+                };
+                userListEl.appendChild(btn);
+            });
         }
+        
+        if (sharedWith.length > 0) {
+            const divider = document.createElement('div');
+            divider.className = 'border-t border-slate-200 my-2';
+            divider.innerHTML = '<p class="text-xs text-slate-400 py-2 text-center">Usuários com acesso:</p>';
+            userListEl.appendChild(divider);
+            
+            sharedWith.forEach(userId => {
+                const user = this.usersList.find(u => u.id === userId);
+                const btn = document.createElement('button');
+                btn.className = 'w-full p-3 bg-rose-50 rounded-lg text-left hover:bg-rose-100 transition';
+                btn.innerHTML = `
+                    <div class="font-bold text-rose-700">${user ? this.escapeHtml(user.email) : 'Remover acesso'}</div>
+                    <div class="text-xs text-rose-400">${userId}</div>
+                `;
+                btn.onclick = () => {
+                    const newShared = sharedWith.filter(id => id !== userId);
+                    this.hideModal('userSelectModal');
+                    this.updateSharedWith(debtId, newShared);
+                };
+                userListEl.appendChild(btn);
+            });
+        }
+        
+        this.showModal('userSelectModal');
     },
 
     async updateSharedWith(debtId, updatedShared) {
