@@ -1325,13 +1325,15 @@ const app = {
                         if (isCompact) {
                             return `<div class="grid grid-cols-6 gap-0.5 text-xs">` + 
                                 d.installments.map(i => `
-                                    <div onclick="app.toggleCompactInstallment('${d.id}', ${i.id})" class="p-2 rounded cursor-pointer ${i.status === 'Pago' ? 'bg-emerald-100 text-emerald-700 border-2 border-emerald-500' : 'bg-slate-100 text-slate-600 border-2 border-transparent hover:border-indigo-300'} flex flex-col items-center">
+                                    <div onclick="app.toggleCompactInstallment('${d.id}', ${i.id})" class="p-2 rounded cursor-pointer ${i.status === 'Pago' ? 'bg-emerald-100 text-emerald-700 border-2 border-emerald-500' : (i.status === 'Aguardando Confirmação' ? 'bg-amber-100 text-amber-700 border-2 border-amber-500 animate-pulse' : 'bg-slate-100 text-slate-600 border-2 border-transparent hover:border-indigo-300')} flex flex-col items-center">
                                         <div class="font-bold text-xs">R$ ${parseFloat(i.value).toFixed(0)}</div>
                                         <div class="text-[9px]">${i.dueDate ? i.dueDate.split('T')[0].slice(5) : ''}</div>
                                         <div class="mt-1">
                                             ${i.status === 'Pago' 
                                                 ? '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="text-emerald-600"><polyline points="20 6 9 17 4 12"/></svg>' 
-                                                : '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="text-slate-400"><circle cx="12" cy="12" r="10"/></svg>'}
+                                                : (i.status === 'Aguardando Confirmação' 
+                                                    ? '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="text-amber-600"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>'
+                                                    : '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="text-slate-400"><circle cx="12" cy="12" r="10"/></svg>')}
                                         </div>
                                     </div>
                                 `).join('') + 
@@ -1465,7 +1467,7 @@ const app = {
         const inst = debt.installments.find(i => i.id === parseInt(instId));
         if (!inst) return;
         
-        const newStatus = inst.status === 'Pago' ? 'Pendente' : 'Pago';
+        const newStatus = (inst.status === 'Pago' || inst.status === 'Aguardando Confirmação') ? 'Pendente' : 'Pago';
         this.updateStatus(debtId, instId, newStatus);
     },
 
@@ -1527,13 +1529,22 @@ const app = {
         const debt = this.debtsLocal.find(d => d.id === debtId);
         if (!debt) return;
 
+        const isCreator = debt.creator_id === this.currentUser.id;
+        let finalStatus = 'Pago';
+        let isWaiting = false;
+
+        if (!isCreator) {
+            finalStatus = 'Aguardando Confirmação';
+            isWaiting = true;
+        }
+
         const newInsts = debt.installments.map(i => {
             const key = `${debtId}_${i.id}`;
             if (this.selectedInstallments.has(key) && i.status !== 'Pago') {
                 return { 
                     ...i, 
-                    status: 'Pago', 
-                    paidAt: new Date().toISOString().slice(0, 16)
+                    status: finalStatus, 
+                    paidAt: (i.status === 'Aguardando Confirmação' || i.status === 'Pago') ? i.paidAt : new Date().toISOString().slice(0, 16)
                 };
             }
             return i;
@@ -1551,7 +1562,7 @@ const app = {
                 if (error) throw error;
                 
                 this.selectedInstallments.clear();
-                this.showToast('Parcelas marcadas como pago!', 'success');
+                this.showToast(isWaiting ? 'Enviado para confirmação do credor!' : 'Parcelas marcadas como pago!', 'success');
                 await this.loadDebts();
             } catch (err) {
                 this.showToast('Erro ao atualizar parcelas', 'error');
