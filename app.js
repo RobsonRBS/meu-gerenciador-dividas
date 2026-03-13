@@ -707,13 +707,13 @@ const app = {
 
     addMultipleInstallments(debtId) {
         const debt = this.debtsLocal.find(d => d.id === debtId);
-        const lastId = Math.max(...debt.installments.map(i => i.id)) || 0;
+        const lastId = debt.installments.length > 0 ? Math.max(...debt.installments.map(i => i.id)) : 0;
         const lastInst = debt.installments.length > 0 ? debt.installments[debt.installments.length - 1] : null;
         const defaultValue = lastInst ? lastInst.value : '';
 
         this.showPrompt(
             'Adicionar Múltiplas Parcelas',
-            'Quantas parcelas deseja adicionar?',
+            'Quantas parcelas?',
             '1',
             (countStr) => {
                 const count = parseInt(countStr);
@@ -724,22 +724,13 @@ const app = {
 
                 this.showPrompt(
                     'Valor de cada parcela',
-                    'Valor de cada nova parcela',
+                    'Valor de cada parcela',
                     defaultValue,
                     (val) => {
                         if (!val || isNaN(parseFloat(val))) {
                             this.showToast('Valor inválido', 'error');
                             return;
                         }
-
-                        const dateInput = document.getElementById('datePickerDate');
-                        const timeInput = document.getElementById('datePickerTime');
-                        
-                        dateInput.value = new Date().toISOString().split('T')[0];
-                        timeInput.value = '00:00';
-
-                        const titleEl = document.getElementById('datePickerTitle');
-                        titleEl.textContent = 'Primeiro Vencimento';
 
                         this.datePickerContext = { 
                             debtId, 
@@ -748,6 +739,10 @@ const app = {
                             count: count,
                             mode: 'addMultipleInstallments'
                         };
+                        
+                        document.getElementById('datePickerDate').value = new Date().toISOString().split('T')[0];
+                        document.getElementById('datePickerTime').value = '00:00';
+                        document.getElementById('datePickerTitle').textContent = 'Primeiro Vencimento';
                         this.showModal('datePickerModal');
                     }
                 );
