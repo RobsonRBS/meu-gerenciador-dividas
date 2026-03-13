@@ -107,6 +107,53 @@ const app = {
         }
     },
 
+    showSettingsModal() {
+        this.showModal('settingsModal');
+    },
+
+    showChangePasswordModal() {
+        document.getElementById('newPassword').value = '';
+        document.getElementById('confirmPassword').value = '';
+        document.getElementById('passwordError').classList.add('hidden');
+        this.hideModal('settingsModal');
+        this.showModal('changePasswordModal');
+    },
+
+    async changePassword() {
+        const newPassword = document.getElementById('newPassword').value;
+        const confirmPassword = document.getElementById('confirmPassword').value;
+        const errorEl = document.getElementById('passwordError');
+
+        if (newPassword.length < 6) {
+            errorEl.textContent = 'Senha deve ter pelo menos 6 caracteres';
+            errorEl.classList.remove('hidden');
+            return;
+        }
+
+        if (newPassword !== confirmPassword) {
+            errorEl.textContent = 'As senhas não coincidem';
+            errorEl.classList.remove('hidden');
+            return;
+        }
+
+        this.showLoading();
+        try {
+            const { error } = await this.supabaseClient.auth.updateUser({
+                password: newPassword
+            });
+
+            if (error) throw error;
+
+            this.hideModal('changePasswordModal');
+            this.showToast('Senha alterada com sucesso!', 'success');
+        } catch (err) {
+            errorEl.textContent = err.message;
+            errorEl.classList.remove('hidden');
+        } finally {
+            this.hideLoading();
+        }
+    },
+
     showModal(id) {
         document.getElementById(id).classList.remove('hidden');
     },

@@ -52,10 +52,34 @@
             <p id="userEmail" class="text-[10px] font-black text-slate-400 mt-1 uppercase tracking-widest"></p>
         </div>
         <div class="flex gap-2">
+            <button onclick="app.showSettingsModal()" class="p-2 text-slate-400 font-bold text-sm">⚙️</button>
             <button onclick="app.logout()" class="p-2 text-slate-400 font-bold text-sm">SAIR</button>
             <button onclick="app.showModal('debtModal')" class="bg-indigo-600 text-white w-12 h-12 rounded-lg shadow-lg flex items-center justify-center font-bold text-2xl">+</button>
         </div>
     </header>
+
+    <div id="settingsModal" class="hidden fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-sm rounded-lg p-6 shadow-2xl">
+            <h3 class="text-xl font-black uppercase text-center mb-4 text-slate-800">Configurações</h3>
+            <div class="space-y-3">
+                <button onclick="app.showChangePasswordModal()" class="w-full py-3 bg-slate-100 text-slate-700 rounded-lg font-bold text-left px-4">🔑 Alterar Senha</button>
+                <button onclick="app.hideModal('settingsModal')" class="w-full py-3 bg-slate-200 text-slate-500 rounded-lg font-bold">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="changePasswordModal" class="hidden fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-sm rounded-lg p-6 shadow-2xl">
+            <h3 class="text-xl font-black uppercase text-center mb-4 text-slate-800">Nova Senha</h3>
+            <input type="password" id="newPassword" placeholder="Nova senha" class="w-full p-4 bg-slate-100 rounded-xl font-bold text-lg mb-4 outline-none">
+            <input type="password" id="confirmPassword" placeholder="Confirmar senha" class="w-full p-4 bg-slate-100 rounded-xl font-bold text-lg mb-4 outline-none">
+            <p id="passwordError" class="text-red-500 text-xs font-bold mb-2 hidden"></p>
+            <div class="flex gap-3">
+                <button onclick="app.hideModal('changePasswordModal')" class="flex-1 py-4 bg-slate-100 text-slate-600 rounded-xl font-black uppercase text-sm">Cancelar</button>
+                <button onclick="app.changePassword()" class="flex-1 py-4 bg-indigo-600 text-white rounded-xl font-black uppercase text-sm">Salvar</button>
+            </div>
+        </div>
+    </div>
 
     <div id="loadingOverlay" class="fixed inset-0 z-[200] bg-slate-900/50 backdrop-blur-sm hidden flex items-center justify-center">
         <div class="bg-white rounded-3xl p-8 shadow-2xl">
