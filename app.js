@@ -576,6 +576,106 @@ const app = {
             this.hideLoading();
         }
     },
+    async exportMobilePDF(debtId) {
+        const debt = this.debtsLocal.find(d => d.id === debtId);
+        if (!debt) return;
+
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        
+        // Colors
+        const primary = [79, 70, 229]; // Indigo-600
+        const dark = [30, 41, 59];    // Slate-800
+        const light = [148, 163, 184]; // Slate-400
+        const green = [16, 185, 129]; // Emerald-500
+        
+        // Header
+        doc.setFillColor(...primary);
+        doc.rect(0, 0, 210, 40, 'F');
+        
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(24);
+        doc.setFont("helvetica", "bold");
+        doc.text("EXTRATO DE DÍVIDA", 20, 20);
+        
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.text(`Gerado em: ${new Date().toLocaleString()}`, 20, 30);
+        
+        // Info Section
+        doc.setTextColor(...dark);
+        doc.setFontSize(16);
+        doc.setFont("helvetica", "bold");
+        doc.text(`${debt.creditor} -> ${debt.debtor}`, 20, 55);
+        
+        doc.setFontSize(12);
+        doc.setTextColor(...light);
+        doc.text(debt.description || "Sem descrição", 20, 62);
+
+        // Summary Line
+        const totalPaid = debt.installments.filter(i => i.status === 'Pago').reduce((sum, i) => sum + parseFloat(i.value), 0);
+        const totalPending = debt.installments.filter(i => i.status !== 'Pago').reduce((sum, i) => sum + parseFloat(i.value), 0);
+        
+        doc.setFillColor(248, 250, 252); // Slate-50
+        doc.rect(20, 70, 170, 20, 'F');
+        
+        doc.setTextColor(...dark);
+        doc.setFontSize(10);
+        doc.text("TOTAL PAGO", 30, 78);
+        doc.setTextColor(...green);
+        doc.setFontSize(14);
+        doc.text(`R$ ${totalPaid.toFixed(2)}`, 30, 85);
+        
+        doc.setTextColor(...dark);
+        doc.setFontSize(10);
+        doc.text("TOTAL PENDENTE", 120, 78);
+        doc.setTextColor(225, 29, 72); // Rose-600
+        doc.setFontSize(14);
+        doc.text(`R$ ${totalPending.toFixed(2)}`, 120, 85);
+        
+        // Table Header
+        let y = 105;
+        doc.setFillColor(...dark);
+        doc.rect(20, y, 170, 8, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(9);
+        doc.text("PARCELA", 25, y+5);
+        doc.text("VALOR", 60, y+5);
+        doc.text("VENCIMENTO", 100, y+5);
+        doc.text("STATUS", 150, y+5);
+        
+        y += 15;
+        debt.installments.forEach((i, idx) => {
+            if (y > 270) { doc.addPage(); y = 20; }
+            
+            doc.setTextColor(...dark);
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "normal");
+            doc.text(`${idx + 1}/${debt.installments.length}`, 25, y);
+            doc.setFont("helvetica", "bold");
+            doc.text(`R$ ${parseFloat(i.value).toFixed(2)}`, 60, y);
+            doc.setFont("helvetica", "normal");
+            doc.text(this.formatDateForDisplay(i.dueDate), 100, y);
+            
+            if (i.status === 'Pago') {
+                doc.setTextColor(...green);
+                doc.text("PAGO", 150, y);
+            } else if (i.status === 'Aguardando Confirmação') {
+                doc.setTextColor(217, 119, 6); // Amber-600
+                doc.text("AGUARD. CONF.", 150, y);
+            } else {
+                doc.setTextColor(225, 29, 72);
+                doc.text("PENDENTE", 150, y);
+            }
+            
+            doc.setDrawColor(241, 245, 249);
+            doc.line(20, y+2, 190, y+2);
+            y += 10;
+        });
+        
+        doc.save(`extrato_${debt.creditor}_${debt.debtor}.pdf`);
+        this.showToast('PDF Gerado!', 'success');
+    },
 
     async confirmPayment(debtId, instId) {
         const debt = this.debtsLocal.find(d => d.id === debtId);
@@ -1301,9 +1401,11 @@ const app = {
                         <button onclick="app.addInstallment('${d.id}')" title="Adicionar 1 Parcela" class="py-3 bg-indigo-600 text-white rounded-lg font-black text-xs uppercase">+1</button>
                         <button onclick="app.addMultipleInstallments('${d.id}')" title="Múltiplas Parcelas" class="py-3 bg-indigo-600 text-white rounded-lg font-black text-xs uppercase">+Multi</button>
                     </div>
-                    <div class="grid grid-cols-2 gap-2">
-                        <button onclick="app.shareDebt('${d.id}')" class="py-3 bg-white border border-slate-300 text-slate-600 rounded-xl font-black text-[10px] uppercase">${(d.shared_with || []).length > 0 ? `Compartilhado (${d.shared_with.length})` : 'Compartilhar'}</button>
-                        <button onclick="app.showMyId()" class="py-3 bg-white border border-slate-300 text-slate-600 rounded-xl font-black text-[10px] uppercase">Meu ID</button>
+                    <div class="grid grid-cols-1 gap-2">
+                        <button onclick="app.shareDebt('${d.id}')" class="py-3 bg-white border border-slate-300 text-slate-600 rounded-xl font-black text-[10px] uppercase flex items-center justify-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+                            ${(d.shared_with || []).length > 0 ? `Compartilhado (${d.shared_with.length})` : 'Compartilhar'}
+                        </button>
                     </div>
 
                     <div class="flex gap-2 flex-wrap">
