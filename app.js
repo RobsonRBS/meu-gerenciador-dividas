@@ -1261,10 +1261,18 @@ const app = {
                              </div>
                              ${(this.globalCompactMode && !isExp && canEdit) ? `
                                 <div class="flex gap-2 mt-1 justify-end opacity-40 hover:opacity-100 transition-opacity">
-                                    <button onclick="event.stopPropagation(); app.cloneDebt('${d.id}')" title="Clonar" class="text-xs">👯</button>
-                                    <button onclick="event.stopPropagation(); app.exportMobilePDF('${d.id}')" title="PDF" class="text-xs">📄</button>
-                                    <button onclick="event.stopPropagation(); app.deleteDebt('${d.id}')" title="Excluir" class="text-xs">🗑️</button>
-                                    <button onclick="event.stopPropagation(); app.toggleExpand('${d.id}')" title="Detalhes" class="text-xs">🔍</button>
+                                    <button onclick="event.stopPropagation(); app.cloneDebt('${d.id}')" title="Clonar" class="p-1 hover:text-indigo-600">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                    </button>
+                                    <button onclick="event.stopPropagation(); app.exportMobilePDF('${d.id}')" title="PDF" class="p-1 hover:text-amber-600">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                                    </button>
+                                    <button onclick="event.stopPropagation(); app.deleteDebt('${d.id}')" title="Excluir" class="p-1 hover:text-rose-600">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                                    </button>
+                                    <button onclick="event.stopPropagation(); app.toggleExpand('${d.id}')" title="Detalhes" class="p-1 hover:text-indigo-600">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                    </button>
                                 </div>
                              ` : ''}
                         </div>
@@ -1317,10 +1325,14 @@ const app = {
                         if (isCompact) {
                             return `<div class="grid grid-cols-6 gap-0.5 text-xs">` + 
                                 d.installments.map(i => `
-                                    <div onclick="app.toggleCompactInstallment('${d.id}', ${i.id})" class="p-2 rounded cursor-pointer ${i.status === 'Pago' ? 'bg-emerald-100 text-emerald-700 border-2 border-emerald-500' : 'bg-slate-100 text-slate-600 border-2 border-transparent hover:border-indigo-300'}">
+                                    <div onclick="app.toggleCompactInstallment('${d.id}', ${i.id})" class="p-2 rounded cursor-pointer ${i.status === 'Pago' ? 'bg-emerald-100 text-emerald-700 border-2 border-emerald-500' : 'bg-slate-100 text-slate-600 border-2 border-transparent hover:border-indigo-300'} flex flex-col items-center">
                                         <div class="font-bold text-xs">R$ ${parseFloat(i.value).toFixed(0)}</div>
                                         <div class="text-[9px]">${i.dueDate ? i.dueDate.split('T')[0].slice(5) : ''}</div>
-                                        <div class="text-[8px] mt-1">${i.status === 'Pago' ? '✅' : '⏳'}</div>
+                                        <div class="mt-1">
+                                            ${i.status === 'Pago' 
+                                                ? '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="text-emerald-600"><polyline points="20 6 9 17 4 12"/></svg>' 
+                                                : '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="text-slate-400"><circle cx="12" cy="12" r="10"/></svg>'}
+                                        </div>
                                     </div>
                                 `).join('') + 
                                 `</div>`;
@@ -1348,13 +1360,23 @@ const app = {
                                                 <p class="text-[10px] font-bold text-slate-400" onclick="event.stopPropagation(); app.editDate('${d.id}', ${i.id}, 'dueDate')">Venc: <span class="underline">${app.formatDateForDisplay(i.dueDate)}</span></p>
                                                 ${(i.paidAt || i.status === 'Aguardando Confirmação') ? `<p class="text-[10px] font-bold text-emerald-400">Enviado: <span class="underline">${app.formatDateTimeForDisplay(i.paidAt)}</span></p>` : ''}
                                             </div>
-                                            ${i.status === 'Aguardando Confirmação' ? `<div class="text-[10px] font-black text-amber-500 uppercase mt-1">⚠️ Aguardando credor confirmar</div>` : (i.note ? `<div class="text-[10px] font-bold text-slate-500 mt-1" onclick="event.stopPropagation(); app.editInstallmentNote('${d.id}', ${i.id})">📝 ${i.note}</div>` : '')}
+                                            ${i.status === 'Aguardando Confirmação' ? `<div class="text-[10px] font-black text-amber-500 uppercase mt-1 flex items-center gap-1">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                                                Aguardando credor confirmar
+                                            </div>` : (i.note ? `<div class="text-[10px] font-bold text-slate-500 mt-1 flex items-center gap-1" onclick="event.stopPropagation(); app.editInstallmentNote('${d.id}', ${i.id})">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                                                ${i.note}
+                                            </div>` : '')}
                                         </div>
                                     </div>
                                     <div class="flex items-center gap-2">
                                         ${(i.status === 'Aguardando Confirmação' && canEdit) ? `<button onclick="event.stopPropagation(); app.confirmPayment('${d.id}', ${i.id})" class="bg-emerald-500 text-white px-3 py-1 rounded text-[10px] font-black hover:bg-emerald-600 transition">CONFIRMAR</button>` : ''}
-                                        <button onclick="event.stopPropagation(); app.editInstallmentValue('${d.id}', ${i.id})" class="text-slate-300 p-2 font-black text-xs hover:text-indigo-500">EDIT</button>
-                                        <button onclick="event.stopPropagation(); app.removeInstallment('${d.id}', ${i.id})" class="text-rose-200 p-2 font-black text-xl hover:text-rose-500">✕</button>
+                                        <button onclick="event.stopPropagation(); app.editInstallmentValue('${d.id}', ${i.id})" title="Editar Valor" class="text-slate-300 p-2 hover:text-indigo-500">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                        </button>
+                                        <button onclick="event.stopPropagation(); app.removeInstallment('${d.id}', ${i.id})" title="Remover Parcela" class="text-rose-200 p-2 hover:text-rose-500">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                        </button>
                                     </div>
                                 </div>
                             </div>
