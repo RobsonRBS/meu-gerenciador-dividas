@@ -1427,7 +1427,7 @@ const app = {
                         if (isCompact) {
                             return `<div class="grid grid-cols-6 gap-0.5 text-xs">` + 
                                 d.installments.map(i => `
-                                    <div onclick="app.toggleCompactInstallment('${d.id}', ${i.id})" class="p-2 rounded cursor-pointer ${i.status === 'Pago' ? 'bg-emerald-100 text-emerald-700 border-2 border-emerald-500' : (i.status === 'Aguardando Confirmação' ? 'bg-amber-100 text-amber-700 border-2 border-amber-500 animate-pulse' : 'bg-slate-100 text-slate-600 border-2 border-transparent hover:border-indigo-300')} flex flex-col items-center">
+                                    <div onclick="app.toggleCompactInstallment('${d.id}', ${i.id})" class="p-2 rounded cursor-pointer ${i.status === 'Pago' ? 'bg-emerald-100 text-emerald-700 border-2 border-emerald-500' : (i.status === 'Aguardando Confirmação' ? 'bg-amber-100 text-amber-700 border-2 border-amber-500 animate-pulse' : 'bg-slate-100 text-slate-600 border-2 border-transparent hover:border-indigo-300')} flex flex-col items-center relative">
                                         <div class="font-bold text-xs">R$ ${parseFloat(i.value).toFixed(0)}</div>
                                         <div class="text-[9px]">${i.dueDate ? i.dueDate.split('T')[0].slice(5) : ''}</div>
                                         <div class="mt-1">
@@ -1437,6 +1437,9 @@ const app = {
                                                     ? '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="text-amber-600"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>'
                                                     : '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="text-slate-400"><circle cx="12" cy="12" r="10"/></svg>')}
                                         </div>
+                                        ${(i.status === 'Aguardando Confirmação' && canEdit) ? `
+                                            <button onclick="event.stopPropagation(); app.confirmPayment('${d.id}', ${i.id})" class="mt-2 bg-emerald-500 text-white px-2 py-0.5 rounded-[4px] text-[8px] font-black hover:bg-emerald-600 transition shadow-sm uppercase">Confirmar</button>
+                                        ` : ''}
                                     </div>
                                 `).join('') + 
                                 `</div>`;
@@ -1490,20 +1493,49 @@ const app = {
                     
                     <button onclick="app.deleteDebt('${d.id}')" class="w-full py-3 text-rose-500 font-black text-xs uppercase tracking-[0.3em] bg-rose-50 rounded-lg mt-3">Excluir dívida</button>
                     ` : `
-                    <div class="space-y-2">
-                        ${d.installments.map(i => `
-                            <div class="p-3 flex items-center justify-between border border-slate-200 bg-white rounded-lg">
-                                <div>
-                                    <p class="text-lg font-black ${i.status === 'Pago' ? 'text-emerald-500' : 'text-slate-800'}">R$ ${i.value}</p>
-                                    <div class="flex gap-4 mt-1">
-                                        <p class="text-xs font-bold text-slate-400">Venc: ${app.formatDateForDisplay(i.dueDate)}</p>
-                                        ${i.paidAt ? `<p class="text-xs font-bold text-emerald-400">Pago: ${app.formatDateTimeForDisplay(i.paidAt)}</p>` : ''}
+                    <div class="flex gap-2 flex-wrap mb-4">
+                        ${this.selectedInstallments.size > 0 ? `
+                            <button onclick="app.markSelectedAsPaid('${d.id}')" class="py-2 px-3 bg-emerald-500 text-white rounded-lg font-black text-xs uppercase">Notificar Pagamento (${this.selectedInstallments.size})</button>
+                            <button onclick="app.clearSelectionInDebt('${d.id}')" class="py-2 px-3 bg-slate-100 text-slate-500 rounded-lg font-black text-xs uppercase">Limpar</button>
+                        ` : `
+                            <button onclick="app.selectPendingInDebt('${d.id}')" class="py-2 px-3 bg-amber-100 text-amber-700 rounded-lg font-black text-xs uppercase">Selecionar Pendentes</button>
+                        `}
+                    </div>
+                    <div class="space-y-1">
+                        ${d.installments.map(i => {
+                            const isSelected = this.selectedInstallments.has(`${d.id}_${i.id}`);
+                            return `
+                            <div class="relative rounded-lg overflow-hidden">
+                                <div class="swipe-bg-right uppercase">Pagar</div>
+                                <div class="swipe-bg-left uppercase">Pendente</div>
+                                <div class="inst-card p-2 flex items-center justify-between border ${isSelected ? 'border-indigo-500 bg-indigo-50 shadow-inner' : (i.status === 'Aguardando Confirmação' ? 'border-amber-300 bg-amber-50' : 'border-slate-200')}" 
+                                     ontouchstart="app.tS(event)" 
+                                     ontouchmove="app.tM(event)" 
+                                     ontouchend="app.tE(event, '${d.id}', ${i.id})"
+                                     onmousedown="app.tS(event)"
+                                     onmousemove="app.tM(event)"
+                                     onmouseup="app.tE(event, '${d.id}', ${i.id})"
+                                     onclick="app.toggleInstallmentSelection('${d.id}', ${i.id}, event)">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-2 h-10 rounded-full ${i.status === 'Pago' ? 'bg-emerald-400' : (i.status === 'Aguardando Confirmação' ? 'bg-amber-400' : 'bg-slate-200')}"></div>
+                                        <div>
+                                            <p class="text-lg font-black ${i.status === 'Pago' ? 'text-emerald-600' : (i.status === 'Aguardando Confirmação' ? 'text-amber-600' : 'text-slate-800')}">R$ ${i.value}</p>
+                                            <div class="flex gap-4 mt-1">
+                                                <p class="text-[10px] font-bold text-slate-400">Venc: ${app.formatDateForDisplay(i.dueDate)}</p>
+                                                ${(i.paidAt || i.status === 'Aguardando Confirmação') ? `<p class="text-[10px] font-bold text-emerald-400">Enviado: ${app.formatDateTimeForDisplay(i.paidAt)}</p>` : ''}
+                                            </div>
+                                            ${i.status === 'Aguardando Confirmação' ? `
+                                                <div class="text-[10px] font-black text-amber-500 uppercase mt-1 flex items-center gap-1">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                                                    Aguardando confirmação do credor
+                                                </div>
+                                            ` : ''}
+                                        </div>
                                     </div>
-                                    ${i.note ? `<div class="text-xs font-bold text-slate-500 mt-1">📝 ${i.note}</div>` : ''}
+                                    <div class="text-2xl">${i.status === 'Pago' ? '✅' : (i.status === 'Aguardando Confirmação' ? '⏳' : '')}</div>
                                 </div>
-                                <div class="text-2xl">${i.status === 'Pago' ? '✅' : '⏳'}</div>
                             </div>
-                        `).join('')}
+                        `;}).join('')}
                     </div>
                     `}
                 </div>
