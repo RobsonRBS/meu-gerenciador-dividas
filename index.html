@@ -15,7 +15,9 @@
     <div id="loginScreen" class="fixed inset-0 z-[100] bg-slate-900 flex items-center justify-center p-6 text-white hidden">
         <div class="modal-content max-w-sm w-full space-y-6 text-center">
             <h1 class="text-5xl font-black italic mb-8 uppercase tracking-tighter">DebtFlow</h1>
+            <label for="email" class="sr-only">Email</label>
             <input type="email" id="email" placeholder="Email" class="w-full p-5 rounded-lg text-slate-900 font-bold text-lg outline-none">
+            <label for="password" class="sr-only">Senha</label>
             <input type="password" id="password" placeholder="Senha" class="w-full p-5 rounded-lg text-slate-900 font-bold text-lg outline-none">
             <div class="flex gap-3">
                 <button onclick="app.handleAuth('login')" class="flex-1 bg-indigo-600 py-5 rounded-lg font-black text-lg uppercase">Entrar</button>
@@ -54,13 +56,13 @@
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
                     <span class="hidden md:inline">TEMPLATES</span>
                 </button>
-                <button onclick="app.showSettingsModal()" class="p-2 text-slate-400 hover:text-indigo-600 transition-colors">
+                <button onclick="app.showSettingsModal()" aria-label="Configurações" class="p-2 text-slate-400 hover:text-indigo-600 transition-colors">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
                 </button>
-                <button onclick="app.logout()" class="p-2 text-slate-400 hover:text-rose-600 transition-colors">
+                <button onclick="app.logout()" aria-label="Sair" class="p-2 text-slate-400 hover:text-rose-600 transition-colors">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
                 </button>
-                <button onclick="app.showModal('debtModal')" class="bg-indigo-600 text-white w-12 h-12 rounded-lg shadow-lg flex items-center justify-center hover:bg-indigo-700 transition-all hover:scale-105 active:scale-95 shadow-indigo-200">
+                <button onclick="app.showModal('debtModal')" aria-label="Adicionar nova dívida" class="bg-indigo-600 text-white w-12 h-12 rounded-lg shadow-lg flex items-center justify-center hover:bg-indigo-700 transition-all hover:scale-105 active:scale-95 shadow-indigo-200">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 </button>
             </div>
@@ -162,14 +164,32 @@
         <form id="debtForm" class="modal-content bg-white w-full max-w-md rounded-xl p-8 space-y-4 shadow-2xl overflow-y-auto max-h-[90vh]">
             <h2 class="text-2xl font-black uppercase italic text-center">Novo Registro</h2>
             <div class="grid grid-cols-2 gap-2">
-                <input type="text" id="creditor" placeholder="Credor" class="p-4 bg-slate-100 rounded-xl font-bold text-lg" required>
-                <input type="text" id="debtor" placeholder="Devedor" class="p-4 bg-slate-100 rounded-xl font-bold text-lg" required>
+                <div>
+                    <label for="creditor" class="sr-only">Credor</label>
+                    <input type="text" id="creditor" placeholder="Credor" class="p-4 bg-slate-100 rounded-xl font-bold text-lg" required>
+                </div>
+                <div>
+                    <label for="debtor" class="sr-only">Devedor</label>
+                    <input type="text" id="debtor" placeholder="Devedor" class="p-4 bg-slate-100 rounded-xl font-bold text-lg" required>
+                </div>
             </div>
-            <textarea id="description" placeholder="Descrição (opcional)" class="w-full p-4 bg-slate-100 rounded-xl font-bold text-lg h-24 outline-none"></textarea>
-            <input type="number" id="totalValue" placeholder="Valor Total" step="0.01" class="w-full p-4 bg-slate-100 rounded-xl font-bold text-lg" required>
+            <div>
+                <label for="description" class="sr-only">Descrição</label>
+                <textarea id="description" placeholder="Descrição (opcional)" class="w-full p-4 bg-slate-100 rounded-xl font-bold text-lg h-24 outline-none"></textarea>
+            </div>
+            <div>
+                <label for="totalValue" class="sr-only">Valor Total</label>
+                <input type="number" id="totalValue" placeholder="Valor Total" step="0.01" class="w-full p-4 bg-slate-100 rounded-xl font-bold text-lg" required>
+            </div>
             <div class="grid grid-cols-2 gap-2">
-                <input type="number" id="installmentsCount" placeholder="Nº Parc." class="p-4 bg-slate-100 rounded-xl font-bold text-lg" value="1">
-                <input type="datetime-local" id="firstDueDate" class="p-4 bg-slate-100 rounded-xl font-bold text-lg">
+                <div>
+                    <label for="installmentsCount" class="sr-only">Número de Parcelas</label>
+                    <input type="number" id="installmentsCount" placeholder="Nº Parc." class="p-4 bg-slate-100 rounded-xl font-bold text-lg" value="1">
+                </div>
+                <div>
+                    <label for="firstDueDate" class="sr-only">Primeiro Vencimento</label>
+                    <input type="datetime-local" id="firstDueDate" class="p-4 bg-slate-100 rounded-xl font-bold text-lg">
+                </div>
             </div>
             <button type="submit" class="w-full bg-indigo-600 text-white py-5 rounded-lg font-black text-xl uppercase">Confirmar</button>
             <button type="button" onclick="app.hideModal('debtModal')" class="w-full text-slate-400 font-bold text-sm uppercase">Cancelar</button>

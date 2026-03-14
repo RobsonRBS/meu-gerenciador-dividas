@@ -82,7 +82,6 @@ const app = {
     },
 
     showResetPasswordModal() {
-        console.log('Opening reset password modal');
         document.getElementById('resetEmail').value = document.getElementById('email').value;
         document.getElementById('resetError').classList.add('hidden');
         this.showModal('resetPasswordModal');
@@ -143,7 +142,7 @@ const app = {
                 document.getElementById('userEmail').innerText = this.escapeHtml(this.userName);
             }
         } catch (err) {
-            console.log('Erro ao carregar nome:', err);
+            // Silently fail - display name is optional
         }
     },
 
@@ -336,9 +335,7 @@ const app = {
             }
             
             this.usersList = users.filter(u => u.id !== this.currentUser?.id);
-            console.log('Users loaded:', this.usersList);
         } catch (err) {
-            console.log('Erro ao carregar usuários:', err);
             this.usersList = [];
         }
     },
@@ -596,7 +593,7 @@ const app = {
             this.hideLoading();
         }
     },
-    async exportMobilePDF(debtId) {
+    async exportPDF(debtId) {
         const debt = this.debtsLocal.find(d => d.id === debtId);
         if (!debt) return;
 
@@ -847,10 +844,6 @@ const app = {
         }
         
         this.datePickerContext = null;
-    },
-
-    confirmDatePicker() {
-        this.handleDatePickerConfirm();
     },
 
     cancelDatePicker() {
